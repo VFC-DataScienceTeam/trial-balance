@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*~
+
+# Virtual env
+.env
+.venv/
+venv/
+ENV/
+
+# IPython
+.ipynb_checkpoints/
+
+# Data (exclude actual data files but keep structure)
+data/raw/**
+data/processed/**
+data/external/**
+!data/**/.gitkeep
+!data/**/README.md
+
+# Models and reports
+models/
+reports/**
+!reports/**/README.md
+!reports/**/.gitkeep
+
+# Logs
+logs/**
+!logs/README.md
+!logs/.gitkeep
+
+# Config (keep examples, exclude actual config with secrets)
+config/config.yml
+config/secrets.yml
+config/*.local.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

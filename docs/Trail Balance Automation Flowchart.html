@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trial Balance Automation Flowchart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            padding: 20px;
+        }
+        /* Flowchart Node Styles */
+        .node {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-height: 4rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: default;
+        }
+        .node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        .manual-step {
+            background-color: #fce7f3; /* Pink for Manual */
+            border: 2px solid #e879f9;
+        }
+        .system-step {
+            background-color: #dbeafe; /* Blue for System */
+            border: 2px solid #60a5fa;
+        }
+        .output-step {
+            background-color: #d1fae5; /* Green for Output */
+            border: 2px solid #34d399;
+        }
+        .start-end-step {
+            background-color: #fff;
+            border: 2px solid #9ca3af;
+            font-weight: 700;
+        }
+        .data-source {
+            background-color: #fffbeb; /* Yellow for Data Sources */
+            border: 2px solid #fbbf24;
+            font-weight: 600;
+        }
+        /* Line connecting blocks */
+        .flow-line {
+            height: 2.5rem; /* Space between steps */
+            width: 2px;
+            background-color: #9ca3af;
+            margin: 0 auto;
+        }
+        /* Arrow head using border technique */
+        .arrow-down {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #9ca3af;
+            margin: 0 auto;
+        }
+        /* Boundary box for Automation Scope */
+        #automation-scope {
+            border: 3px dashed #10b981; /* Emerald Green */
+            padding: 2rem 1rem;
+            margin-top: 2rem;
+            border-radius: 1rem;
+            position: relative;
+        }
+        #automation-scope::before {
+            content: "AUTOMATION SCOPE";
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background-color: #10b981;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">Cleaned Trial Balance Automation Flow</h1>
+    <p class="text-gray-600 mb-8">Visualization of the three-step automated workflow for preparing the Trial Balance (TB). Manual and System responsibilities are clearly delineated.</p>
+
+    <!-- Legend -->
+    <div class="mb-8 p-4 bg-white rounded-lg shadow-md flex flex-wrap gap-4 justify-center text-sm">
+        <span class="flex items-center"><span class="w-4 h-4 rounded-full bg-fce7f3 border-2 border-e879f9 mr-2"></span> Fund Accounting (Manual)</span>
+        <span class="flex items-center"><span class="w-4 h-4 rounded-full bg-dbeafe border-2 border-60a5fa mr-2"></span> System Automation (Code)</span>
+        <span class="flex items-center"><span class="w-4 h-4 rounded-full bg-d1fae5 border-2 border-34d399 mr-2"></span> Output File</span>
+        <span class="flex items-center"><span class="w-4 h-4 rounded-full bg-fffbeb border-2 border-fbbf24 mr-2"></span> Data Source (Input)</span>
+    </div>
+
+    <!-- Flowchart Container -->
+    <div class="flex flex-col items-center">
+
+        <!-- START Node -->
+        <div class="node start-end-step w-full md:w-3/5">START</div>
+        <div class="flow-line"></div>
+        <div class="arrow-down"></div>
+
+        <!-- Inputs Section -->
+        <div class="flex flex-col md:flex-row justify-center gap-4 w-full mb-8">
+            <div class="node data-source flex-1">
+                <p><strong>Raw TB Data</strong><br><span class="text-xs text-gray-700">(From Ideal Wealth & Funds)</span></p>
+            </div>
+            <div class="node data-source flex-1">
+                <p><strong>Chart of Accounts (COA) Mapping</strong><br><span class="text-xs text-gray-700">(Manual Reference File)</span></p>
+            </div>
+        </div>
+        <div class="flow-line !h-4"></div>
+        <div class="arrow-down"></div>
+        
+        <!-- Step 1: Manual Upload -->
+        <div class="node manual-step w-full md:w-4/5">
+            <p class="font-semibold">STEP 1: Upload Raw Data</p>
+            <p class="text-sm">User places TB & COA files into the designated `/data/raw/` folder.</p>
+        </div>
+        <div class="flow-line"></div>
+        <div class="arrow-down"></div>
+
+        <!-- Automation Scope Start -->
+        <div id="automation-scope" class="w-full">
+            
+            <!-- Step 2: Trigger Processing -->
+            <div class="node system-step w-full md:w-3/4 mx-auto">
+                <p class="font-semibold">STEP 2: System Trigger & Data Ingestion</p>
+                <p class="text-sm">Automation process is manually triggered by the user/scheduler.</p>
+            </div>
+            <div class="flow-line !h-3"></div>
+            <div class="arrow-down"></div>
+
+            <!-- Step 2.1: Core Processing -->
+            <div class="node system-step w-full md:w-3/4 mx-auto bg-blue-100">
+                <p class="font-semibold text-lg">CORE PROCESSING (2-5 MINS PER FUND)</p>
+                <ul class="text-left mt-2 text-sm list-disc pl-5">
+                    <li>**Cleansing & Validation:** Formatting, header standardization.</li>
+                    <li>**Account Mapping:** Apply `Chart of Accounts Mapping` rules.</li>
+                    <li>**Aggregation:** Create Pivot/SUMIF logic (grouping by Fund/Account).</li>
+                    <li>**Exclusion:** Remove all zero-balance accounts.</li>
+                </ul>
+            </div>
+            <div class="flow-line"></div>
+            <div class="arrow-down"></div>
+
+            <!-- Step 3: Output Generation -->
+            <div class="node system-step w-full md:w-3/4 mx-auto">
+                <p class="font-semibold">STEP 3: Generate Final Reports</p>
+                <p class="text-sm">Files are generated and saved to the `/data/processed/` folders.</p>
+            </div>
+
+        </div> 
+        <!-- Automation Scope End -->
+        
+        <div class="flow-line"></div>
+        <div class="arrow-down"></div>
+        
+        <!-- Outputs Section -->
+        <div class="flex flex-col md:flex-row justify-center gap-4 w-full mb-8">
+            <div class="node output-step flex-1">
+                <p><strong>Cleaned Trial Balance</strong><br><span class="text-xs text-gray-700">`.../Trail Balance/{year}/January/...`</span></p>
+            </div>
+            <div class="node output-step flex-1">
+                <p><strong>Monthly Trial Balance</strong><br><span class="text-xs text-gray-700">`.../Trail Balance/{year}/Monthly/...`</span></p>
+            </div>
+        </div>
+        
+        <!-- END Node -->
+        <div class="flow-line"></div>
+        <div class="arrow-down"></div>
+        <div class="node start-end-step w-full md:w-3/5">END (Reports Ready for Consumption)</div>
+
+    </div>
+</div>
+
+<script>
+    // This is a static visualization, so no complex JS is needed, but we keep the structure for completeness.
+    // If this were a real application, the 'Trigger Processing' node would have an associated API call.
+</script>
+
+</body>
+</html>

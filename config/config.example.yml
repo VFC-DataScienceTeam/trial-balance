@@ -1,0 +1,40 @@
+# Application configuration (example - copy to config.yml and update)
+
+# File paths
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  reports: "reports"
+  logs: "logs"
+
+# Validation settings
+validation:
+  balance_tolerance: 0.01  # Allow 1 cent rounding differences
+  required_fields:
+    - account_number
+    - account_description
+    - debit
+    - credit
+    - entity
+    - period
+  
+# Reporting settings
+reports:
+  output_format: "xlsx"  # xlsx, csv, pdf
+  include_charts: true
+  email_on_completion: false
+  
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/trial_balance.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# Database (if applicable - DO NOT COMMIT REAL CREDENTIALS)
+database:
+  host: "localhost"
+  port: 5432
+  database: "trial_balance"
+  username: "your_username"
+  password: "USE_ENVIRONMENT_VARIABLE"  # Set via env var: TB_DB_PASSWORD
