@@ -143,15 +143,22 @@ class TrialBalanceApp:
         log_frame = ttk.LabelFrame(self.root, text="Processing Log", padding="10")
         log_frame.grid(row=5, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
         
+        # Log control buttons
+        log_button_frame = ttk.Frame(log_frame)
+        log_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        ttk.Button(log_button_frame, text="🗑️ Clear Log", 
+                  command=self.clear_log, width=15).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
         self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=90,
                                                   font=('Courier', 9))
-        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights for resizing
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(5, weight=1)
         log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
+        log_frame.rowconfigure(1, weight=1)
         
         # Load initial reports list
         self.refresh_reports_list()
@@ -319,6 +326,11 @@ class TrialBalanceApp:
         self.log_text.insert(tk.END, log_entry)
         self.log_text.see(tk.END)
         self.root.update()
+    
+    def clear_log(self):
+        """Clear the log display"""
+        self.log_text.delete(1.0, tk.END)
+        self.log_message("✨ Log cleared", 'INFO')
     
     def run_notebook_processing(self):
         """Run the full notebook processing - writes config file for notebook to read"""
