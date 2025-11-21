@@ -81,11 +81,21 @@ This folder contains all technical and user documentation for the Trial Balance 
 - GUI display features
 - Output folder structure
 
+### 7. [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ **NEW**
+**For:** All users  
+**Purpose:** Choose where reports are saved (shared drive vs local)  
+**Contains:**
+- How to use output location selector
+- Shared drive vs local storage comparison
+- When to use each option
+- Troubleshooting output location issues
+- Technical implementation details
+
 ---
 
 ## 🔄 Workflow & Process
 
-### 7. [workflow-diagram.md](workflow-diagram.md)
+### 8. [workflow-diagram.md](workflow-diagram.md)
 **For:** Technical users  
 **Purpose:** Visual process flow  
 **Contains:**
@@ -93,7 +103,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 - Data flow visualization
 - Processing steps
 
-### 8. [Trail Balance Automation Flowchart.html](Trail%20Balance%20Automation%20Flowchart.html)
+### 9. [Trail Balance Automation Flowchart.html](Trail%20Balance%20Automation%20Flowchart.html)
 **For:** All users  
 **Purpose:** Interactive flowchart  
 **Contains:**
@@ -105,7 +115,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## ⚙️ Configuration & Setup
 
-### 9. [config-fallback-system.md](config-fallback-system.md)
+### 10. [config-fallback-system.md](config-fallback-system.md)
 **For:** Developers  
 **Purpose:** Understanding config system  
 **Contains:**
@@ -113,7 +123,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 - Fallback to auto-detection
 - GUI → Notebook bridge
 
-### 10. [HOW_PATHS_WORK.md](HOW_PATHS_WORK.md)
+### 11. [HOW_PATHS_WORK.md](HOW_PATHS_WORK.md)
 **For:** Developers  
 **Purpose:** Path resolution logic  
 **Contains:**
@@ -121,7 +131,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 - Project root detection
 - Cross-platform compatibility
 
-### 11. [QUICKSTART-CONFIG-FALLBACK.md](QUICKSTART-CONFIG-FALLBACK.md)
+### 12. [QUICKSTART-CONFIG-FALLBACK.md](QUICKSTART-CONFIG-FALLBACK.md)
 **For:** Developers  
 **Purpose:** Quick reference for config system  
 **Contains:**
@@ -132,7 +142,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## 🔌 Integration & Deployment
 
-### 12. [GITHUB_SETUP.md](GITHUB_SETUP.md)
+### 13. [GITHUB_SETUP.md](GITHUB_SETUP.md)
 **For:** Developers, DevOps  
 **Purpose:** GitHub repository setup  
 **Contains:**
@@ -140,7 +150,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 - Branch structure
 - Collaboration guidelines
 
-### 13. [IMPLEMENTATION-SUMMARY.md](IMPLEMENTATION-SUMMARY.md)
+### 14. [IMPLEMENTATION-SUMMARY.md](IMPLEMENTATION-SUMMARY.md)
 **For:** Developers  
 **Purpose:** Implementation decisions log  
 **Contains:**
@@ -148,7 +158,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 - Technical decisions
 - Change history
 
-### 14. [VERIFICATION-CHECKLIST.md](VERIFICATION-CHECKLIST.md)
+### 15. [VERIFICATION-CHECKLIST.md](VERIFICATION-CHECKLIST.md)
 **For:** QA, Developers  
 **Purpose:** Testing and validation  
 **Contains:**
@@ -160,7 +170,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## 📝 Draft Documentation
 
-### 15. [draft/](draft/)
+### 16. [draft/](draft/)
 **For:** Internal reference  
 **Purpose:** Work-in-progress documentation  
 **Contains:**
@@ -172,7 +182,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## 📄 Additional Resources
 
-### 16. [DGD - Trial Balance - v1.0.docx.pdf](DGD%20-%20Trial%20Balance%20-%20v1.0.docx.pdf)
+### 17. [DGD - Trial Balance - v1.0.docx.pdf](DGD%20-%20Trial%20Balance%20-%20v1.0.docx.pdf)
 **For:** Business stakeholders  
 **Purpose:** Original requirements document  
 **Contains:**
@@ -187,7 +197,8 @@ This folder contains all technical and user documentation for the Trial Balance 
 ### Business Users (Non-Technical)
 1. **Start here:** [GETTING_STARTED.md](GETTING_STARTED.md)
 2. **Visual guide:** [simple_user_guide.pdf](../simple_user_guide.pdf)
-3. **Find outputs:** [OUTPUT_DIRECTORIES.md](OUTPUT_DIRECTORIES.md)
+3. **Choose output location:** [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ NEW
+4. **Find outputs:** [OUTPUT_DIRECTORIES.md](OUTPUT_DIRECTORIES.md)
 
 ### Data Analysts / Power Users
 1. **Start here:** [GETTING_STARTED.md](GETTING_STARTED.md)
@@ -218,6 +229,7 @@ This folder contains all technical and user documentation for the Trial Balance 
 | Run the system for first time | [GETTING_STARTED.md](GETTING_STARTED.md) |
 | Understand the code structure | [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) |
 | Find output files | [OUTPUT_DIRECTORIES.md](OUTPUT_DIRECTORIES.md) |
+| Choose output location | [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ |
 | Reproduce results | [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) → Reproducibility Guide |
 | Understand data flow | [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) → Data Flow section |
 | Find function definitions | [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) → Functions Reference |
@@ -230,9 +242,9 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## 📊 Documentation Statistics
 
-- **Total Documents:** 16 files + draft folder
+- **Total Documents:** 17 files + draft folder
 - **Primary Reference:** TECHNICAL_DOCUMENTATION.md (comprehensive)
-- **User Guides:** 3 files (Getting Started, User Guide, README)
+- **User Guides:** 4 files (Getting Started, User Guide, Output Location Guide, README)
 - **Technical Docs:** 8 files
 - **Configuration:** 3 files
 - **Verification:** 2 files

@@ -27,7 +27,7 @@
 trial-balance/
 ├── .venv/                          # Virtual environment (Python 3.12.2)
 ├── config/
-│   └── run_config.json             # GUI-generated configuration (Year, Month, Path)
+│   └── run_config.json             # GUI-generated configuration (Year, Month, Input Path, Output Path)
 ├── data/
 │   ├── raw/
 │   │   └── Trial Balance/
@@ -162,6 +162,10 @@ trial-balance/
         ↓
 [Cell 96: Define export_segmented_summary()]
 [Cell 97: Call export] → Trial Balance Monthly.xlsx (16 sheets)
+        ↓
+[Reports saved to user-selected location:]
+  • Shared Drive: X:\Trail Balance\data\processed\Trail Balance\{YEAR}\
+  • Local Storage: {project_root}\data\processed\Trail Balance\{YEAR}\
         ↓
 [Reports displayed in GUI]
 ```

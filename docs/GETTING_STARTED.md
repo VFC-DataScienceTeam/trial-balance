@@ -36,6 +36,10 @@
 3. **In the GUI window**:
    - Select **Year** (e.g., 2025)
    - Select **Month** (e.g., September)
+   - **Choose Output Location**:
+     - **Shared Drive (X:\Trail Balance)** - Save to shared drive (default, recommended for team access)
+     - **Local Storage (Project Folder)** - Save to your computer (for personal/backup copies)
+   - 💡 The path display below shows exactly where reports will be saved
    - Click **"📊 Process Report"**
 
 4. **Wait for processing** (watch the log window)
@@ -66,9 +70,26 @@ data/raw/Trial Balance/
 
 ### Output Files (What Gets Generated):
 
+#### Reports Location (You Choose!):
+
+**Option 1: Shared Drive (Default)**
+```
+X:\Trail Balance\data\processed\Trail Balance\2025\
+├── Trial_Balance.xlsx
+└── Trial Balance Monthly.xlsx
+```
+
+**Option 2: Local Storage**
+```
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\data\processed\Trail Balance\2025\
+├── Trial_Balance.xlsx
+└── Trial Balance Monthly.xlsx
+```
+
+#### Other Output Files (Always Local):
+
 | Report Type | Location | Filename Example |
 |------------|----------|------------------|
-| **📊 Main Excel Report** | `data/processed/Trail Balance/2025/` | `Trial Balance Monthly.xlsx` |
 | **📋 COA Mapping** | `data/references/COA Mapping/` | `Chart of Accounts Mapping as of 09.30.2025.xlsx` |
 | **📓 Executed Notebook** | `notebooks/executed_trial_balance_reports/` | `trial_balance_report_20251121_143022.ipynb` |
 | **📄 Log File** | `logs/` | `trial_balance_20251121_143022.log` |
@@ -107,6 +128,19 @@ Run `scripts\launchers\setup_env_trial_balance.bat` again
 ### Problem: Can't find the Excel report
 **Solution**: 
 Click **"📂 Open Results Folder"** button in GUI - it opens the exact location!
+
+### Problem: Reports not saving to shared drive
+**Solution**: 
+1. Check dropdown is set to "Shared Drive (X:\Trail Balance)"
+2. Verify path display shows blue text with X:\ drive
+3. Ensure shared drive is accessible (open File Explorer → X:\Trail Balance)
+4. Check processing log for "💾 Output Location: Shared Drive" message
+
+### Problem: Want to save reports to both locations
+**Solution**: 
+1. Process with "Shared Drive" selected first
+2. Change dropdown to "Local Storage"
+3. Process again - this creates a local backup copy
 
 ---
 
