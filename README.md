@@ -2,6 +2,22 @@
 
 Automated trial balance validation, reconciliation, and reporting system following the CRISP-DM framework.
 
+## 📚 Documentation
+
+**All documentation is organized in the [`docs/`](docs/) folder.**
+
+👉 **[View Complete Documentation Index](docs/README.md)**
+
+### Quick Links
+
+| For... | Start Here |
+|--------|------------|
+| 🚀 **First-time users** | [Getting Started Guide](docs/GETTING_STARTED.md) |
+| 📖 **Complete technical reference** | [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md) ⭐ |
+| 📂 **Finding output files** | [Output Directories Guide](docs/OUTPUT_DIRECTORIES.md) |
+| 📋 **All project files** | [File Index](docs/FILE_INDEX.md) |
+| 🔄 **Process workflow** | [Workflow Diagrams](docs/workflow-diagram.md) |
+
 ## 📊 Visual Workflow
 
 For a comprehensive visual representation of the automation workflow, see:
@@ -80,37 +96,131 @@ trial-balance/
    - Generate final reports
    - Distribute to stakeholders
 
-See `docs/draft/crisp-dm.md` for detailed phase mapping.
+See [`docs/draft/crisp-dm.md`](docs/draft/crisp-dm.md) for detailed phase mapping.
 
-## Quick Start
+## 🚀 Quick Start
 
-1. **Place raw data**:
-   - Trial balance files → `data/raw/trial_balance_inputs/`
-   - Chart of accounts → `data/raw/gl_accounts/`
-   - Mapping tables → `data/raw/mapping_tables/`
+📖 **Detailed instructions**: See [GETTING_STARTED.md](docs/GETTING_STARTED.md) for complete setup guide
 
-2. **Configure settings**:
-   - Copy `config/config.example.yml` to `config/config.yml`
-   - Update paths and validation rules
+### First Time Setup
 
-3. **Install dependencies**:
+1. **Run the setup script** (ONE TIME ONLY):
+   ```bash
+   scripts\launchers\setup_env_trial_balance.bat
+   ```
+   This creates the virtual environment and installs all dependencies.
+
+### For Business Users (Recommended)
+
+**Run the GUI application**:
+```bash
+launch_gui.bat    ← Double-click this file in the project root!
+```
+
+**Steps**:
+1. Select **Year** from dropdown (e.g., 2025)
+2. Select **Month** from dropdown (e.g., September)
+3. Click **"📊 Process Report"** button
+4. Wait for completion (real-time log in GUI)
+5. Click **"📂 Open Results Folder"** to view outputs
+
+**Output Locations**:
+- 📊 **Excel Reports**: `data/processed/Trail Balance/{year}/Trial Balance Monthly.xlsx`
+- 📋 **COA Mappings**: `data/references/COA Mapping/Chart of Accounts Mapping as of MM.DD.YYYY.xlsx`
+- 📓 **Executed Notebooks**: `notebooks/executed_trial_balance_reports/`
+- 📄 **Logs**: `logs/trial_balance_YYYYMMDD_HHMMSS.log`
+
+📖 **See**: [OUTPUT_DIRECTORIES.md](docs/OUTPUT_DIRECTORIES.md) for complete details
+
+---
+
+### For Data Scientists / Developers
+
+1. **Place raw data** in proper structure:
+   ```
+   data/raw/Trial Balance/
+   └── {YEAR}/
+       └── {MONTH}/
+           ├── Trial Balance/
+           │   ├── MM-DD-YYYY.csv (daily files)
+           │   └── ...
+           └── Chart of Accounts/
+               └── RD - Chart of Accounts.csv
+   ```
+
+2. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Run validation**:
-   - Start with notebooks in `notebooks/01_data_exploration/`
-   - Move production code to `src/`
+3. **Run the notebook**:
+   - Open `notebooks/01-rd-trial-balance-mvp.ipynb`
+   - Run all cells (auto-detects latest year/month if no config file)
 
-5. **Generate reports**:
-   - Outputs saved to `reports/trial_balance_outputs/`
-   - Validation reports in `reports/validation_reports/`
+4. **Outputs**:
+   - Logs: `logs/trial_balance_YYYYMMDD_HHMMSS.log`
+   - Reports: `data/processed/Trail Balance/{year}/`
+   - Updated COA: `data/references/COA Mapping/`
+
+📖 **See**: 
+- [config-fallback-system.md](docs/config-fallback-system.md) for architecture details
+- [TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) for complete technical reference
 
 ## Key Features
 
-- **Automated validation**: Balance checks, schema validation, business rules
+- **GUI-based operation**: User-friendly interface for business users
+- **3-tier fallback system**: Config file → Auto-detect → Clear error
+- **Automated validation**: Balance checks, GL account matching, business rules
 - **Reconciliation**: Period-over-period, inter-company eliminations
 - **Variance analysis**: Identify and explain significant variances
-- **Audit trail**: Complete lineage from source to report
-- **Configurable**: YAML-based configuration for rules and settings
+- **Comprehensive logging**: Real-time progress tracking and audit trail
+- **Robust error handling**: Clear, actionable error messages with full paths
+
+## System Architecture
+
+### Config + Fallback System
+
+The system uses a **3-tier approach** to determine which data folder to load:
+
+1. **PRIMARY (Tier 1)**: User selection via GUI
+   - GUI validates folder exists
+   - Writes absolute path to `config/run_config.json`
+   - Notebook reads config and loads data
+
+2. **FALLBACK (Tier 2)**: Auto-detect latest year/month
+   - Used when no config file exists (direct notebook execution)
+   - Finds latest year folder (numeric, descending)
+   - Finds latest month folder (by modification time)
+
+3. **TERMINAL (Tier 3)**: Clear error if no data found
+   - Logs full paths for debugging
+   - Raises `FileNotFoundError` with actionable guidance
+
+**Benefits**:
+- ✅ Works in both GUI and direct notebook modes
+- ✅ Robust error handling with clear messages
+- ✅ Comprehensive logging at each tier
+- ✅ Absolute paths eliminate ambiguity
+
+📖 **See**: [config-fallback-system.md](docs/config-fallback-system.md) for complete architecture details
+
+---
+
+## 📚 Complete Documentation
+
+All documentation is organized in the [`docs/`](docs/) folder:
+
+- **[Documentation Index](docs/README.md)** - Complete guide to all documentation
+- **[Getting Started](docs/GETTING_STARTED.md)** - Step-by-step user guide
+- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)** - Comprehensive technical reference
+- **[File Index](docs/FILE_INDEX.md)** - Complete file inventory
+- **[Output Directories](docs/OUTPUT_DIRECTORIES.md)** - Output locations guide
+- **[Workflow Diagrams](docs/workflow-diagram.md)** - Visual process flows
+
+**For technical details**, see [TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) which includes:
+- Complete data inventory
+- DataFrame transformations
+- Functions reference with code examples
+- Reproducibility guide
+- Extension points for customization
 
