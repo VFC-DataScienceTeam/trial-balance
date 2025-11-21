@@ -84,26 +84,36 @@ class TrialBalanceApp:
                                         state='readonly', width=30)
         self.month_combo.grid(row=1, column=1, padx=10, pady=5)
         
+        # Input data location selection
+        ttk.Label(selection_frame, text="Load Data From:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.input_location = tk.StringVar(value="local")
+        input_combo = ttk.Combobox(selection_frame, textvariable=self.input_location,
+                                    state='readonly', width=30)
+        input_combo['values'] = ('Local Storage (Project Folder)', 'Shared Drive (X:\\Trail Balance)')
+        input_combo.grid(row=2, column=1, padx=10, pady=5)
+        input_combo.current(0)  # Default to local
+        input_combo.bind('<<ComboboxSelected>>', self.on_input_location_changed)
+        
         # Path display
-        ttk.Label(selection_frame, text="Selected Path:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(selection_frame, text="Selected Path:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
         self.path_label = ttk.Label(selection_frame, text="No selection", 
                                     foreground='gray', font=('Arial', 9))
-        self.path_label.grid(row=2, column=1, sticky=tk.W, padx=10, pady=5)
+        self.path_label.grid(row=3, column=1, sticky=tk.W, padx=10, pady=5)
         
         # Output location selection
-        ttk.Label(selection_frame, text="Save Output To:", font=('Arial', 10, 'bold')).grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(selection_frame, text="Save Output To:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky=tk.W, pady=5)
         self.output_location = tk.StringVar(value="shared_drive")
         output_combo = ttk.Combobox(selection_frame, textvariable=self.output_location,
                                      state='readonly', width=30)
         output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
-        output_combo.grid(row=3, column=1, padx=10, pady=5)
+        output_combo.grid(row=4, column=1, padx=10, pady=5)
         output_combo.current(0)  # Default to shared drive
         output_combo.bind('<<ComboboxSelected>>', self.on_output_location_changed)
         
         # Output path display
         self.output_path_label = ttk.Label(selection_frame, text="X:\\Trail Balance\\data\\processed\\Trail Balance\\", 
                                            foreground='blue', font=('Arial', 9))
-        self.output_path_label.grid(row=4, column=1, sticky=tk.W, padx=10, pady=2)
+        self.output_path_label.grid(row=5, column=1, sticky=tk.W, padx=10, pady=2)
         
         # Buttons Frame
         button_frame = ttk.Frame(self.root, padding="10")
@@ -247,6 +257,23 @@ class TrialBalanceApp:
             output_path = str(self.project_root / 'data' / 'processed' / 'Trail Balance')
             self.output_path_label.config(text=output_path, foreground='green')
             self.log_message("💾 Output will be saved to: Local Storage", 'INFO')
+        
+        # Refresh reports list to show files from new location
+        self.refresh_reports_list()
+    
+    def on_input_location_changed(self, event):
+        """Handle input data location selection change"""
+        selection = self.input_location.get()
+        
+        if "Shared Drive" in selection:
+            self.base_path = Path("X:/Trail Balance/data/raw/Trial Balance")
+            self.log_message("📂 Input data will be loaded from: Shared Drive", 'INFO')
+        else:
+            self.base_path = self.project_root / 'data' / 'raw' / 'Trial Balance'
+            self.log_message("📂 Input data will be loaded from: Local Storage", 'INFO')
+        
+        # Reload year and month folders from new location
+        self.load_year_folders()
     
     def refresh_reports_list(self):
         """Refresh the list of generated reports and COA mappings"""
@@ -254,11 +281,17 @@ class TrialBalanceApp:
             # Clear current list
             self.reports_listbox.delete(0, tk.END)
             
-            # === SECTION 1: Excel Reports ===
-            self.reports_listbox.insert(tk.END, "═══ EXCEL REPORTS ═══")
+            # Determine output location based on dropdown selection
+            selection = self.output_location.get()
+            if "Shared Drive" in selection:
+                output_base = Path("X:/Trail Balance/data/processed/Trail Balance")
+                location_label = "📁 SHARED DRIVE"
+            else:
+                output_base = self.project_root / 'data' / 'processed' / 'Trail Balance'
+                location_label = "💻 LOCAL STORAGE"
             
-            # Find Excel reports in data/processed/Trail Balance/{year}/
-            output_base = self.project_root / 'data' / 'processed' / 'Trail Balance'
+            # === SECTION 1: Excel Reports ===
+            self.reports_listbox.insert(tk.END, f"═══ EXCEL REPORTS ({location_label}) ===")
             
             excel_files = []
             if output_base.exists():
@@ -292,8 +325,14 @@ class TrialBalanceApp:
                         f"({file_info['size']:.2f} MB)"
                     )
                     self.reports_listbox.insert(tk.END, display_text)
+                
+                # Add summary
+                total_size = sum(f['size'] for f in excel_files)
+                self.reports_listbox.insert(tk.END, f"  ✓ Total: {len(excel_files)} files ({total_size:.2f} MB)")
+                self.reports_listbox.insert(tk.END, f"  📂 Location: {output_base}")
             else:
                 self.reports_listbox.insert(tk.END, "  (No Excel reports found)")
+                self.reports_listbox.insert(tk.END, f"  📂 Location: {output_base}")
             
             # === SECTION 2: COA Mappings ===
             self.reports_listbox.insert(tk.END, "")
