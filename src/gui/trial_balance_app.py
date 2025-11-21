@@ -90,6 +90,21 @@ class TrialBalanceApp:
                                     foreground='gray', font=('Arial', 9))
         self.path_label.grid(row=2, column=1, sticky=tk.W, padx=10, pady=5)
         
+        # Output location selection
+        ttk.Label(selection_frame, text="Save Output To:", font=('Arial', 10, 'bold')).grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.output_location = tk.StringVar(value="shared_drive")
+        output_combo = ttk.Combobox(selection_frame, textvariable=self.output_location,
+                                     state='readonly', width=30)
+        output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
+        output_combo.grid(row=3, column=1, padx=10, pady=5)
+        output_combo.current(0)  # Default to shared drive
+        output_combo.bind('<<ComboboxSelected>>', self.on_output_location_changed)
+        
+        # Output path display
+        self.output_path_label = ttk.Label(selection_frame, text="X:\\Trail Balance\\data\\processed\\Trail Balance\\", 
+                                           foreground='blue', font=('Arial', 9))
+        self.output_path_label.grid(row=4, column=1, sticky=tk.W, padx=10, pady=2)
+        
         # Buttons Frame
         button_frame = ttk.Frame(self.root, padding="10")
         button_frame.grid(row=2, column=0, sticky=(tk.W, tk.E))
@@ -219,6 +234,19 @@ class TrialBalanceApp:
         else:
             self.path_label.config(text="No selection", foreground='gray')
             self.process_button.config(state='disabled')
+    
+    def on_output_location_changed(self, event):
+        """Handle output location selection change"""
+        selection = self.output_location.get()
+        
+        if "Shared Drive" in selection:
+            output_path = "X:\\Trail Balance\\data\\processed\\Trail Balance\\"
+            self.output_path_label.config(text=output_path, foreground='blue')
+            self.log_message("💾 Output will be saved to: Shared Drive", 'INFO')
+        else:
+            output_path = str(self.project_root / 'data' / 'processed' / 'Trail Balance')
+            self.output_path_label.config(text=output_path, foreground='green')
+            self.log_message("💾 Output will be saved to: Local Storage", 'INFO')
     
     def refresh_reports_list(self):
         """Refresh the list of generated reports and COA mappings"""
@@ -376,6 +404,15 @@ class TrialBalanceApp:
                 self.process_button.config(state='normal')
                 return
         
+        # Determine output path based on user selection
+        selection = self.output_location.get()
+        if "Shared Drive" in selection:
+            output_base_path = "X:\\Trail Balance\\data\\processed\\Trail Balance"
+            self.log_message(f"💾 Output Location: Shared Drive", 'INFO')
+        else:
+            output_base_path = str(self.project_root / 'data' / 'processed' / 'Trail Balance')
+            self.log_message(f"💾 Output Location: Local Storage", 'INFO')
+        
         # Write config file for notebook to read (with absolute path)
         import json
         config_path = self.project_root / 'config' / 'run_config.json'
@@ -383,11 +420,13 @@ class TrialBalanceApp:
         config = {
             'year': year,
             'month': month,
-            'data_path': str(data_path)  # Absolute path
+            'data_path': str(data_path),  # Absolute input path
+            'output_base_path': output_base_path  # Output location
         }
         config_path.write_text(json.dumps(config, indent=2))
         self.log_message(f"📝 Config written: {config_path.name}", 'INFO')
-        self.log_message(f"   Data Path: {data_path}", 'INFO')
+        self.log_message(f"   Input Path: {data_path}", 'INFO')
+        self.log_message(f"   Output Path: {output_base_path}\\{year}\\", 'INFO')
         
         # Run in a separate thread to avoid freezing the GUI
         thread = threading.Thread(target=self._execute_notebook, args=(year, month))
@@ -484,9 +523,15 @@ class TrialBalanceApp:
         try:
             self.log_message("\n💾 Opening results folders...", 'INFO')
             
-            # Find the output directories - use absolute paths
-            # Notebook saves Excel files to: data/processed/Trail Balance/{year}/
-            output_dir = self.project_root / 'data' / 'processed' / 'Trail Balance'
+            # Determine output directory based on user selection
+            selection = self.output_location.get()
+            if "Shared Drive" in selection:
+                output_dir = Path("X:/Trail Balance/data/processed/Trail Balance")
+                self.log_message("  📂 Opening Shared Drive output folder...", 'INFO')
+            else:
+                output_dir = self.project_root / 'data' / 'processed' / 'Trail Balance'
+                self.log_message("  📂 Opening Local Storage output folder...", 'INFO')
+            
             executed_dir = self.project_root / 'notebooks' / 'executed_trial_balance_reports'
             
             # Create directories if they don't exist
