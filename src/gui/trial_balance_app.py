@@ -38,37 +38,6 @@ class TrialBalanceApp:
         self.notebook_registry = self.load_notebook_registry()
         self.selected_notebook = tk.StringVar()
         
-        # Theme mode: 'light' or 'dark'
-        self.theme_mode = tk.StringVar(value='light')
-        
-        # Define color schemes
-        self.themes = {
-            'light': {
-                'bg': '#f0f0f0',
-                'fg': '#000000',
-                'frame_bg': '#ffffff',
-                'button_bg': '#e0e0e0',
-                'entry_bg': '#ffffff',
-                'text_bg': '#ffffff',
-                'text_fg': '#000000',
-                'title_fg': '#1a1a1a',
-                'log_bg': '#ffffff',
-                'log_fg': '#000000'
-            },
-            'dark': {
-                'bg': '#1e1e1e',
-                'fg': '#d4d4d4',
-                'frame_bg': '#252526',
-                'button_bg': '#3c3c3c',
-                'entry_bg': '#3c3c3c',
-                'text_bg': '#1e1e1e',
-                'text_fg': '#d4d4d4',
-                'title_fg': '#ffffff',
-                'log_bg': '#1e1e1e',
-                'log_fg': '#d4d4d4'
-            }
-        }
-        
         # Setup logging to capture in GUI
         self.log_stream = StringIO()
         self.setup_logging()
@@ -112,13 +81,6 @@ class TrialBalanceApp:
         self.title_label = ttk.Label(title_frame, text="📊 Trial Balance Data Processor",
                                font=('Arial', 16, 'bold'))
         self.title_label.grid(row=0, column=0, sticky=tk.W)
-        
-        # Theme toggle button
-        self.theme_toggle_btn = ttk.Button(title_frame, text="🌙 Dark Mode",
-                                          command=self.toggle_theme, width=20)
-        self.theme_toggle_btn.grid(row=0, column=1, padx=20, sticky=tk.E)
-        
-        title_frame.columnconfigure(1, weight=1)
         
         # Main content container
         self.main_container = ttk.Frame(self.root)
@@ -402,74 +364,6 @@ class TrialBalanceApp:
         self.on_year_selected(event)
         # Update month combo in notebook tab
         self.nb_month_combo['values'] = self.month_combo['values']
-    
-    def toggle_theme(self):
-        """Toggle between light and dark theme"""
-        current_theme = self.theme_mode.get()
-        
-        if current_theme == 'light':
-            # Switch to dark
-            self.theme_mode.set('dark')
-            self.theme_toggle_btn.config(text="☀️ Light Mode")
-            self.apply_theme('dark')
-        else:
-            # Switch to light
-            self.theme_mode.set('light')
-            self.theme_toggle_btn.config(text="🌙 Dark Mode")
-            self.apply_theme('light')
-    
-    def apply_theme(self, theme_name):
-        """Apply theme colors to all widgets"""
-        colors = self.themes[theme_name]
-        
-        # Root window
-        self.root.configure(bg=colors['bg'])
-        
-        # Configure ttk style
-        style = ttk.Style()
-        
-        if theme_name == 'dark':
-            # Dark theme colors
-            style.theme_use('clam')  # Use clam theme for better dark mode support
-            
-            # Configure colors
-            style.configure('TFrame', background=colors['frame_bg'])
-            style.configure('TLabel', background=colors['frame_bg'], foreground=colors['fg'])
-            style.configure('TLabelframe', background=colors['frame_bg'], foreground=colors['fg'])
-            style.configure('TLabelframe.Label', background=colors['frame_bg'], foreground=colors['fg'])
-            style.configure('TButton', background=colors['button_bg'], foreground=colors['fg'])
-            style.configure('TNotebook', background=colors['frame_bg'])
-            style.configure('TNotebook.Tab', background=colors['button_bg'], foreground=colors['fg'])
-            style.map('TNotebook.Tab', background=[('selected', colors['frame_bg'])])
-            
-            # Combobox
-            style.configure('TCombobox', fieldbackground=colors['entry_bg'], background=colors['button_bg'], foreground=colors['fg'])
-            style.map('TCombobox', fieldbackground=[('readonly', colors['entry_bg'])])
-            style.map('TCombobox', selectbackground=[('readonly', colors['entry_bg'])])
-            style.map('TCombobox', selectforeground=[('readonly', colors['fg'])])
-            
-        else:
-            # Light theme (default)
-            style.theme_use('default')
-            style.configure('TFrame', background=colors['frame_bg'])
-            style.configure('TLabel', background=colors['frame_bg'], foreground=colors['fg'])
-            style.configure('TLabelframe', background=colors['frame_bg'], foreground=colors['fg'])
-            style.configure('TLabelframe.Label', background=colors['frame_bg'], foreground=colors['fg'])
-        
-        # Update log text widget
-        self.log_text.config(bg=colors['log_bg'], fg=colors['log_fg'], insertbackground=colors['fg'])
-        
-        # Update reports listbox
-        self.reports_listbox.config(bg=colors['text_bg'], fg=colors['text_fg'])
-        
-        # Update title label
-        self.title_label.config(foreground=colors['title_fg'])
-        
-        # Update description and outputs text in notebook tab (if exists)
-        if hasattr(self, 'desc_text'):
-            self.desc_text.config(bg=colors['text_bg'], fg=colors['text_fg'], insertbackground=colors['fg'])
-        if hasattr(self, 'outputs_text'):
-            self.outputs_text.config(bg=colors['text_bg'], fg=colors['text_fg'], insertbackground=colors['fg'])
     
     def load_year_folders(self):
         """Load available year folders"""
