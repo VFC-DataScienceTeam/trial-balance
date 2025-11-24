@@ -1,16 +1,28 @@
-# Output Location Selection Guide
+# Data Source & Output Location Selection Guide
 
-**Feature Version:** 1.0  
+**Feature Version:** 2.0  
 **Date Added:** November 21, 2025  
-**Purpose:** Allow users to choose where trial balance reports are saved
+**Last Updated:** November 24, 2025  
+**Purpose:** Choose where to load input data and save output reports with connection status monitoring
 
 ---
 
 ## Overview
 
-The Output Location Selector gives you flexibility to save trial balance reports to either:
+The GUI now provides complete control over both input and output locations:
+
+### **Load Data From** (Input Location)
+- **Local Storage** (Project Folder) - Default, load from local disk
+- **Shared Drive** (X:\Trail Balance) - Load from network shared drive
+
+### **Save Output To** (Output Location)
 - **Shared Drive** (X:\Trail Balance) - For team collaboration and central storage
-- **Local Storage** (Your computer) - For personal copies or when offline
+- **Local Storage** (Project Folder) - For personal copies or when offline
+
+### **Connection Status Indicators**
+- **✓ Connected** (Green) - Location is accessible
+- **✗ Not Found** (Orange) - Path doesn't exist  
+- **✗ No Access** (Red) - Permission or network error
 
 ---
 
@@ -19,8 +31,35 @@ The Output Location Selector gives you flexibility to save trial balance reports
 ### Step 1: Launch the GUI
 Double-click `launch_gui.bat` in the project root folder.
 
-### Step 2: Select Output Location
-In the GUI window, you'll see a dropdown labeled **"Save Output To:"**
+### Step 2: Select Input Location
+In the GUI window, you'll see a dropdown labeled **"Load Data From:"**
+
+**Two options are available:**
+
+#### Option 1: Local Storage (Project Folder) - **DEFAULT**
+```
+✓ Default option
+✓ Load from local disk
+✓ Faster access
+✓ Works offline
+```
+
+**Connection Status:** Green checkmark (✓ Connected) appears if accessible
+
+#### Option 2: Shared Drive (X:\Trail Balance)
+```
+✓ Team collaboration
+✓ Centralized data source
+✓ Network drive access
+✓ Multiple users can access same data
+```
+
+**Connection Status:** Shows ✓ Connected / ✗ Not Found / ✗ No Access
+
+---
+
+### Step 3: Select Output Location
+Below the input selector, you'll see **"Save Output To:"**
 
 **Two options are available:**
 
@@ -37,6 +76,8 @@ In the GUI window, you'll see a dropdown labeled **"Save Output To:"**
 X:\Trail Balance\data\processed\Trail Balance\
 ```
 
+**Connection Status:** Shows ✓ Connected / ✗ Not Found / ✗ No Access
+
 #### Option 2: Local Storage (Project Folder)
 ```
 ✓ Personal backup copy
@@ -50,28 +91,105 @@ X:\Trail Balance\data\processed\Trail Balance\
 D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\data\processed\Trail Balance\
 ```
 
-### Step 3: Process Reports
+**Connection Status:** Shows ✓ Connected / ✗ Not Found / ✗ No Access
+
+### Step 4: Verify Connection Status
+**Before processing**, check the connection indicators:
+- Both should show **✓ Connected** (green)
+- If you see **✗ Not Found** or **✗ No Access**, fix the issue first
+- Shared drive issues typically mean network not connected or drive not mapped
+
+### Step 5: Process Reports
 1. Select Year and Month as usual
-2. Click "📊 Process Report"
-3. Watch the processing log - you'll see:
+2. Verify both locations show **✓ Connected**
+3. Click "📊 Process Report"
+4. Watch the processing log - you'll see:
    ```
-   💾 Output Location: Shared Drive
+   📂 Input data will be loaded from: Shared Drive
+     ✓ Shared drive is accessible
+   💾 Output will be saved to: Shared Drive
+     ✓ Shared drive is accessible
    📂 Output base path: X:\Trail Balance\data\processed\Trail Balance
    ```
 
-### Step 4: Access Results
+### Step 6: Access Results
 Click **"📂 Open Results Folder"** - the button automatically opens the location you selected!
+
+---
+
+## Connection Status Monitoring
+
+### Understanding Status Indicators
+
+| Indicator | Color | Meaning | Action |
+|-----------|-------|---------|--------|
+| **✓ Connected** | Green | Path is accessible | Safe to proceed |
+| **✗ Not Found** | Orange | Path doesn't exist | Check path, create folder if needed |
+| **✗ No Access** | Red | Permission/network error | Check network, permissions, drive mapping |
+
+### Automatic Checks
+
+The GUI automatically checks connection status:
+1. **On startup** - Both locations checked immediately
+2. **When changing dropdown** - New location checked instantly
+3. **Logs status** - Messages appear in Processing Log
+
+### Example Log Messages
+
+**Successful Connection:**
+```
+📂 Input data will be loaded from: Shared Drive
+  ✓ Shared drive is accessible
+```
+
+**Connection Problem:**
+```
+📂 Input data will be loaded from: Shared Drive
+  ⚠️ WARNING: Shared drive not accessible! Check network connection.
+```
+
+### Troubleshooting Connection Issues
+
+**If Shared Drive shows ✗ No Access:**
+1. Open File Explorer → Navigate to `X:\`
+2. If you can't access X:\ drive, it's not mapped
+3. Contact IT to map the shared drive
+4. After mapping, restart the GUI
+
+**If Shared Drive shows ✗ Not Found:**
+1. Check if the specific folder exists: `X:\Trail Balance`
+2. Verify you have the correct drive letter
+3. Check network connection (VPN if working remotely)
+
+**If Local Storage shows ✗ Not Found:**
+1. The project folder structure might be incomplete
+2. Run the setup script to create required folders
+3. Check if you have write permissions to the folder
 
 ---
 
 ## Use Cases
 
-### When to Use Shared Drive
+### Input Location: When to Use Each
 
-✅ **Daily reporting workflow**
-- Reports need to be accessible by team members
-- Standard month-end processing
-- Reports will be reviewed by others
+**Use Shared Drive for Input When:**
+- ✅ Data is centrally maintained on shared drive
+- ✅ Multiple users need to process same data
+- ✅ Working with live, up-to-date data
+- ✅ Team collaboration on same dataset
+
+**Use Local Storage for Input When:**
+- ✅ Working with test data
+- ✅ Processing historical data archived locally
+- ✅ Shared drive is slow or unavailable
+- ✅ Need faster read performance
+
+### Output Location: When to Use Each
+
+**Use Shared Drive for Output When:**
+- ✅ Reports need to be accessible by team members
+- ✅ Standard month-end processing
+- ✅ Reports will be reviewed by others
 
 ✅ **Permanent storage**
 - Official records that need to be archived
@@ -156,22 +274,33 @@ Folders are created automatically if they don't exist.
 
 ## Workflow Examples
 
-### Example 1: Standard Month-End Processing
+### Example 1: Standard Month-End Processing (Full Shared Drive)
 ```
-1. Select: "Shared Drive (X:\Trail Balance)"
-2. Year: 2025, Month: September
-3. Process Report
-4. Result: Reports saved to X:\Trail Balance\data\processed\Trail Balance\2025\
-5. Team members access from X:\ drive
+1. Load Data From: "Shared Drive (X:\Trail Balance)"  → ✓ Connected
+2. Save Output To: "Shared Drive (X:\Trail Balance)"  → ✓ Connected
+3. Year: 2025, Month: September
+4. Process Report
+5. Result: Reads from X:\...\raw\ and saves to X:\...\processed\2025\
+6. Team members access from X:\ drive
 ```
 
-### Example 2: Create Both Shared and Local Copies
+### Example 2: Load from Shared Drive, Save Locally (Backup)
 ```
-1. Select: "Shared Drive (X:\Trail Balance)"
-2. Process Report → Saves to X:\ drive
-3. Change dropdown to: "Local Storage (Project Folder)"
-4. Process Report again → Saves to local disk
-5. Result: Two identical copies in different locations
+1. Load Data From: "Shared Drive (X:\Trail Balance)"  → ✓ Connected
+2. Save Output To: "Local Storage (Project Folder)"   → ✓ Connected  
+3. Process Report
+4. Result: Reads from shared drive, creates local backup
+5. Good for: Personal backup, working offline later
+```
+
+### Example 3: Create Both Shared and Local Copies
+```
+1. Load Data From: "Shared Drive (X:\Trail Balance)"
+2. Save Output To: "Shared Drive (X:\Trail Balance)"
+3. Process Report → Saves to X:\ drive
+4. Change output dropdown to: "Local Storage (Project Folder)"
+5. Process Report again → Saves to local disk
+6. Result: Two identical copies in different locations
 ```
 
 ### Example 3: Test Data Processing Locally First
@@ -238,16 +367,18 @@ Folders are created automatically if they don't exist.
 ### GUI Components
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Select Year:      [2025 ▼]                    │
-│  Select Month:     [September ▼]                │
-│  Data Path:        D:\...\2025\September        │
-│                                                  │
-│  Save Output To:   [Shared Drive (X:\Trail...) ▼]│  ← Output Location Dropdown
-│  Output Path:      X:\Trail Balance\data\...    │  ← Path Display (Blue = Shared, Green = Local)
-│                                                  │
-│  [📊 Process Report]  [📂 Open Results Folder]  │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Select Year:      [2025 ▼]                             │
+│  Select Month:     [September ▼]                         │
+│                                                           │
+│  Load Data From:   [Shared Drive... ▼]  ✓ Connected  │  ← Input Location + Status
+│  Selected Path:    X:\Trail Balance\...\September        │
+│                                                           │
+│  Save Output To:   [Shared Drive... ▼]  ✓ Connected  │  ← Output Location + Status
+│  Output Path:      X:\Trail Balance\data\...            │  ← Blue = Shared, Green = Local
+│                                                           │
+│  [📊 Process Report]  [📂 Open Results Folder]          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### Color Coding
@@ -317,7 +448,8 @@ output_dir = os.path.join(base_dir, year)
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2025-11-21 | Initial release with dropdown selector, color-coded display, and dynamic config writing |
+| 1.0 | 2025-11-21 | Initial release with output location dropdown, color-coded display, dynamic config |
+| 2.0 | 2025-11-24 | Added input location selector, connection status indicators, real-time monitoring |
 
 ---
 

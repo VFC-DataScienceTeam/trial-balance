@@ -36,10 +36,20 @@
 3. **In the GUI window**:
    - Select **Year** (e.g., 2025)
    - Select **Month** (e.g., September)
-   - **Choose Output Location**:
+   
+   - **Choose Where to Load Data From**:
+     - **Local Storage (Project Folder)** - Load from your computer (default)
+     - **Shared Drive (X:\Trail Balance)** - Load from network shared drive
+     - ✅ Check the status indicator: **✓ Connected** (green) = ready to use
+     - ⚠️ If you see **✗ Not Found** or **✗ No Access**, the location is unavailable
+   
+   - **Choose Where to Save Output**:
      - **Shared Drive (X:\Trail Balance)** - Save to shared drive (default, recommended for team access)
      - **Local Storage (Project Folder)** - Save to your computer (for personal/backup copies)
-   - 💡 The path display below shows exactly where reports will be saved
+     - ✅ Check the status indicator: **✓ Connected** (green) = ready to use
+   
+   - 💡 The path display below shows exactly where reports will be saved (Blue = Shared Drive, Green = Local)
+   - ⚠️ **Before clicking Process:** Verify both locations show **✓ Connected**
    - Click **"📊 Process Report"**
 
 4. **Wait for processing** (watch the log window)
@@ -56,16 +66,28 @@
 ## 📁 Where Are My Files?
 
 ### Input Files (What You Provide):
+
+**Can be loaded from either:**
+
+**Local Storage:**
 ```
-data/raw/Trial Balance/
-└── 2025/
-    └── September/
-        ├── Trial Balance/
-        │   ├── 09-01-2025.csv
-        │   ├── 09-02-2025.csv
-        │   └── ... (all daily files)
-        └── Chart of Accounts/
-            └── RD - Chart of Accounts.csv
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\data\raw\Trial Balance\2025\September\
+├── Trial Balance/
+│   ├── 09-01-2025.csv
+│   ├── 09-02-2025.csv
+│   └── ... (all daily files)
+└── Chart of Accounts/
+    └── RD - Chart of Accounts.csv
+```
+
+**Shared Drive:**
+```
+X:\Trail Balance\data\raw\Trial Balance\2025\September\
+├── Trial Balance/
+│   ├── 09-01-2025.csv
+│   └── ...
+└── Chart of Accounts/
+    └── RD - Chart of Accounts.csv
 ```
 
 ### Output Files (What Gets Generated):
@@ -99,6 +121,37 @@ D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\data\processed\Trai
 ---
 
 ## 🔧 Troubleshooting
+
+### Connection Status Indicators
+
+**What the status indicators mean:**
+
+| Indicator | Color | Meaning | What to Do |
+|-----------|-------|---------|------------|
+| **✓ Connected** | Green | Location is accessible and ready | ✅ Safe to proceed |
+| **✗ Not Found** | Orange | Folder doesn't exist at that path | Check if path is correct, create folder if needed |
+| **✗ No Access** | Red | Permission error or network issue | Check VPN, drive mapping, or contact IT |
+
+**If Shared Drive shows ✗ No Access:**
+1. Open File Explorer and try to access `X:\Trail Balance`
+2. If you can't access it, the drive is not mapped
+3. Contact IT to map the X:\ drive
+4. If working remotely, verify VPN is connected
+5. After fixing, restart the GUI
+
+**If Shared Drive shows ✗ Not Found:**
+1. The drive is mapped but the folder `Trail Balance` doesn't exist
+2. Ask your team where the shared folder is located
+3. You may need to create the folder structure
+
+**If Local Storage shows ✗ Not Found:**
+1. The project folder structure is incomplete
+2. Run `setup_env_trial_balance.bat` again
+3. Check if you have write permissions to the project folder
+
+---
+
+## 🔧 Common Issues
 
 ### Problem: GUI won't open
 **Solution**: 

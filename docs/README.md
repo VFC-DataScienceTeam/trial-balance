@@ -1,6 +1,7 @@
 # Trial Balance Automation - Documentation Index
 
-**Last Updated:** November 21, 2025
+**Last Updated:** November 24, 2025  
+**Current Version:** 2.0.0
 
 ---
 
@@ -81,14 +82,16 @@ This folder contains all technical and user documentation for the Trial Balance 
 - GUI display features
 - Output folder structure
 
-### 7. [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ **NEW**
+### 7. [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ **UPDATED v2.0**
 **For:** All users  
-**Purpose:** Choose where reports are saved (shared drive vs local)  
+**Purpose:** Choose where to load data and save reports (shared drive vs local)  
 **Contains:**
-- How to use output location selector
-- Shared drive vs local storage comparison
-- When to use each option
-- Troubleshooting output location issues
+- Input location selector (load data from local or shared drive)
+- Output location selector (save reports to local or shared drive)
+- Connection status indicators (✓ Connected, ✗ Not Found, ✗ No Access)
+- Real-time connection monitoring
+- Troubleshooting connection issues
+- Use cases and workflow examples
 - Technical implementation details
 
 ---
@@ -180,6 +183,22 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ---
 
+## 📋 Version History
+
+### 18. [CHANGELOG.md](../CHANGELOG.md) ⭐ **NEW**
+**For:** All users  
+**Purpose:** Track all changes, releases, and updates  
+**Contains:**
+- Version history with detailed change logs
+- Feature additions and improvements
+- Bug fixes
+- Breaking changes and migration notes
+- Release highlights
+- Commit history with links
+- Future roadmap
+
+---
+
 ## 📄 Additional Resources
 
 ### 17. [DGD - Trial Balance - v1.0.docx.pdf](DGD%20-%20Trial%20Balance%20-%20v1.0.docx.pdf)
@@ -197,8 +216,9 @@ This folder contains all technical and user documentation for the Trial Balance 
 ### Business Users (Non-Technical)
 1. **Start here:** [GETTING_STARTED.md](GETTING_STARTED.md)
 2. **Visual guide:** [simple_user_guide.pdf](../simple_user_guide.pdf)
-3. **Choose output location:** [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ NEW
+3. **Choose locations:** [OUTPUT_LOCATION_GUIDE.md](OUTPUT_LOCATION_GUIDE.md) ⭐ v2.0
 4. **Find outputs:** [OUTPUT_DIRECTORIES.md](OUTPUT_DIRECTORIES.md)
+5. **Version updates:** [CHANGELOG.md](../CHANGELOG.md)
 
 ### Data Analysts / Power Users
 1. **Start here:** [GETTING_STARTED.md](GETTING_STARTED.md)
@@ -242,12 +262,13 @@ This folder contains all technical and user documentation for the Trial Balance 
 
 ## 📊 Documentation Statistics
 
-- **Total Documents:** 17 files + draft folder
+- **Total Documents:** 18 files + draft folder
 - **Primary Reference:** TECHNICAL_DOCUMENTATION.md (comprehensive)
 - **User Guides:** 4 files (Getting Started, User Guide, Output Location Guide, README)
 - **Technical Docs:** 8 files
 - **Configuration:** 3 files
 - **Verification:** 2 files
+- **Version Control:** 1 file (CHANGELOG.md)
 
 ---
 

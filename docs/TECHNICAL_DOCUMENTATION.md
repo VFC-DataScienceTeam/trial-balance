@@ -27,7 +27,7 @@
 trial-balance/
 ├── .venv/                          # Virtual environment (Python 3.12.2)
 ├── config/
-│   └── run_config.json             # GUI-generated configuration (Year, Month, Input Path, Output Path)
+│   └── run_config.json             # GUI-generated configuration (Year, Month, data_path, output_base_path)
 ├── data/
 │   ├── raw/
 │   │   └── Trial Balance/
@@ -57,7 +57,7 @@ trial-balance/
 ├── src/
 │   └── gui/
 │       ├── __init__.py
-│       └── trial_balance_app.py    # Tkinter GUI application
+│       └── trial_balance_app.py    # Tkinter GUI with input/output location selectors & connection monitoring
 ├── scripts/
 │   └── launchers/
 │       ├── setup_env_trial_balance.bat  # Environment setup
@@ -1023,11 +1023,175 @@ def create_segmented_by_account_type(df, account_type_col='Account Type'):
 
 ---
 
+## GUI Application Functions
+
+### TrialBalanceApp Class (`src/gui/trial_balance_app.py`)
+
+The GUI application provides a user-friendly interface with input/output location selectors and real-time connection monitoring.
+
+#### Key Features
+- Dual location selectors (input data source, output destination)
+- Real-time connection status indicators
+- Color-coded path displays
+- Enhanced reports list with location tracking
+- Automatic config generation for notebook execution
+
+---
+
+#### `check_connection(path, location_type="input")`
+
+**Purpose:** Verify that a file system path is accessible and update visual status indicator
+
+**Parameters:**
+- `path` (str): Absolute path to check (e.g., `"X:/Trail Balance"` or local folder path)
+- `location_type` (str): Either `"input"` or `"output"` to determine which status label to update
+
+**Returns:** `bool`
+- `True` if path exists and is accessible
+- `False` if path doesn't exist or is inaccessible
+
+**Visual Feedback:**
+- Updates `self.input_status_label` or `self.output_status_label` based on `location_type`
+- **✓ Connected** (green) - Path exists and is accessible
+- **✗ Not Found** (orange) - Path doesn't exist
+- **✗ No Access** (red) - Permission or network error
+
+**When Called:**
+- On application startup (checks both input and output locations)
+- When user changes input location dropdown
+- When user changes output location dropdown
+
+**Example Usage:**
+```python
+# Check shared drive input location
+if self.check_connection("X:/Trail Balance", "input"):
+    self.log_message("  ✓ Shared drive is accessible", 'INFO')
+else:
+    self.log_message("  ⚠️ WARNING: Shared drive not accessible!", 'WARNING')
+```
+
+**Implementation:**
+```python
+def check_connection(self, path, location_type="input"):
+    """Check if a path is accessible and update status indicator"""
+    try:
+        path_obj = Path(path)
+        if path_obj.exists():
+            # Green checkmark - path is accessible
+            if location_type == "input":
+                self.input_status_label.config(text="✓ Connected", foreground='green')
+            else:
+                self.output_status_label.config(text="✓ Connected", foreground='green')
+            return True
+        else:
+            # Orange warning - path doesn't exist
+            if location_type == "input":
+                self.input_status_label.config(text="✗ Not Found", foreground='orange')
+            else:
+                self.output_status_label.config(text="✗ Not Found", foreground='orange')
+            return False
+    except Exception as e:
+        # Red error - permission or network issue
+        if location_type == "input":
+            self.input_status_label.config(text="✗ No Access", foreground='red')
+        else:
+            self.output_status_label.config(text="✗ No Access", foreground='red')
+        return False
+```
+
+---
+
+#### `on_input_location_changed(event)`
+
+**Purpose:** Handle input location dropdown changes and update connection status
+
+**Behavior:**
+- Updates `self.base_path` to point to selected location
+- Calls `check_connection()` to verify accessibility
+- Logs connection status to processing log
+- Updates selected path display
+
+**Locations:**
+- **Local Storage:** `{project_root}/data/raw/Trial Balance/{year}/{month}`
+- **Shared Drive:** `X:/Trail Balance/data/raw/Trial Balance/{year}/{month}`
+
+---
+
+#### `on_output_location_changed(event)`
+
+**Purpose:** Handle output location dropdown changes and update connection status
+
+**Behavior:**
+- Updates output path configuration
+- Calls `check_connection()` to verify accessibility
+- Logs connection status to processing log
+- Updates output path display (blue for shared, green for local)
+- Refreshes reports list to show files at new location
+
+**Locations:**
+- **Shared Drive:** `X:/Trail Balance/data/processed/Trail Balance`
+- **Local Storage:** `{project_root}/data/processed/Trail Balance`
+
+---
+
+#### `refresh_reports_list()`
+
+**Purpose:** Display generated reports with location indicator and file statistics
+
+**Features:**
+- Shows location label: **📁 SHARED DRIVE** or **💻 LOCAL STORAGE**
+- Lists all Excel files (.xlsx) with file sizes
+- Displays total file count and cumulative size
+- Shows folder path for reference
+
+**Example Output:**
+```
+═══ EXCEL REPORTS (📁 SHARED DRIVE) ===
+  Trial_Balance.xlsx (4.5 MB)
+  Trial Balance Monthly.xlsx (33.0 KB)
+  ✓ Total: 2 files (4.53 MB)
+  📂 Location: X:\Trail Balance\data\processed\Trail Balance\2025
+
+═══ COA MAPPINGS (💻 LOCAL STORAGE) ===
+  Chart of Accounts Mapping as of 09.30.2025.xlsx (85.3 KB)
+  ✓ Total: 1 file (0.08 MB)
+  📂 Location: D:\...\data\references\COA Mapping
+```
+
+---
+
+### Configuration Management
+
+#### `run_config.json` Structure
+
+**Location:** `config/run_config.json`
+
+**Generated By:** GUI application when user clicks "Process Report"
+
+**Schema:**
+```json
+{
+  "year": "2025",
+  "month": "September",
+  "data_path": "X:\\Trail Balance\\data\\raw\\Trial Balance\\2025\\September",
+  "output_base_path": "X:\\Trail Balance\\data\\processed\\Trail Balance"
+}
+```
+
+**Usage:**
+- Notebook reads this config at runtime (Cell 14)
+- `data_path` determines input data source location
+- `output_base_path` determines where reports are saved
+- Dynamically updated when user changes location dropdowns
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-11-21 | Initial release with GUI integration, dual export functions, COA validation |
+| 2.0 | 2025-11-24 | Added input/output location selectors, connection status monitoring, enhanced reports display |
 
 ---
 

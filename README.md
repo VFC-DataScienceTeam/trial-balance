@@ -168,6 +168,17 @@ launch_gui.bat    ← Double-click this file in the project root!
 
 ## Key Features
 
+### Data Source Management
+- **Dual Location Selectors**: Choose where to load input data and save outputs
+  - Input: Local storage or shared drive (X:\Trail Balance)
+  - Output: Local storage or shared drive (X:\Trail Balance)
+- **Real-time Connection Monitoring**: Visual status indicators for data source accessibility
+  - ✓ Connected (green) - Location ready to use
+  - ✗ Not Found (orange) - Path doesn't exist
+  - ✗ No Access (red) - Network or permission issue
+- **Enhanced Reports Display**: View file locations, counts, and sizes at a glance
+
+### Core Functionality
 - **GUI-based operation**: User-friendly interface for business users
 - **3-tier fallback system**: Config file → Auto-detect → Clear error
 - **Automated validation**: Balance checks, GL account matching, business rules
@@ -213,9 +224,11 @@ All documentation is organized in the [`docs/`](docs/) folder:
 - **[Documentation Index](docs/README.md)** - Complete guide to all documentation
 - **[Getting Started](docs/GETTING_STARTED.md)** - Step-by-step user guide
 - **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)** - Comprehensive technical reference
+- **[Output Location Guide](docs/OUTPUT_LOCATION_GUIDE.md)** - Input/output location selection and connection monitoring
 - **[File Index](docs/FILE_INDEX.md)** - Complete file inventory
 - **[Output Directories](docs/OUTPUT_DIRECTORIES.md)** - Output locations guide
 - **[Workflow Diagrams](docs/workflow-diagram.md)** - Visual process flows
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
 
 **For technical details**, see [TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) which includes:
 - Complete data inventory
