@@ -35,6 +35,6 @@ logging:
 database:
   host: "localhost"
   port: 5432
-  database: "trial_balance"
+  database: "trial_balance" # folder
   username: "your_username"
   password: "USE_ENVIRONMENT_VARIABLE"  # Set via env var: TB_DB_PASSWORD

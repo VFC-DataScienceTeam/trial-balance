@@ -1,8 +1,58 @@
-et_xmlfile==2.0.0
-numpy==2.3.4
-openpyxl==3.1.5
-pandas==2.3.3
-python-dateutil==2.9.0.post0
-pytz==2025.2
-six==1.17.0
-tzdata==2025.2
+# ============================================================
+# Trial Balance Automation - Core Dependencies
+# ============================================================
+# Project: PEMI Trial Balance Automation (CRISP-DM Framework)
+# Python Version: 3.12+
+# Last Updated: 2025-11-21
+#
+# INSTALLATION:
+# 1. Create virtual environment: python -m venv .venv
+# 2. Activate: .venv\Scripts\activate (Windows) or source .venv/bin/activate (Unix)
+# 3. Install: pip install -r requirements.txt
+# ============================================================
+
+# ------------------------------
+# Core Data Processing
+# ------------------------------
+pandas>=2.2.0                    # DataFrame operations, CSV/Excel I/O
+numpy>=1.26.0                    # Numerical operations
+openpyxl>=3.1.0                  # Excel XLSX file reading/writing with formatting
+
+# ------------------------------
+# Notebook Execution & GUI
+# ------------------------------
+papermill>=2.6.0                 # Parameterized notebook execution from GUI
+jupyter>=1.0.0                   # Jupyter notebook environment
+jupyterlab>=4.0.0                # JupyterLab interface (optional but recommended)
+ipykernel>=6.29.0                # IPython kernel for notebooks
+ipywidgets>=8.1.0                # Interactive widgets (deprecated in this project but kept for compatibility)
+
+# ------------------------------
+# Date & Time Handling
+# ------------------------------
+python-dateutil>=2.9.0           # Extended datetime utilities
+
+# ------------------------------
+# Logging & Configuration
+# ------------------------------
+PyYAML>=6.0                      # YAML configuration file support (if needed)
+
+# ------------------------------
+# Type Hints & Validation
+# ------------------------------
+typing-extensions>=4.12.0        # Extended type hints for Python 3.12+
+
+# ------------------------------
+# Development & Testing (Optional)
+# ------------------------------
+# pytest>=8.0.0                  # Unit testing framework
+# black>=24.0.0                  # Code formatter
+# flake8>=7.0.0                  # Linting
+
+# ============================================================
+# NOTES:
+# - tkinter: Built-in with Python (used by GUI) - no separate install needed
+# - pathlib, datetime, logging, json: Python standard library
+# - All dependencies use minimum version constraints (>=)
+# - Windows-specific: pywin32 may be needed for Excel automation (not currently used)
+# ============================================================
