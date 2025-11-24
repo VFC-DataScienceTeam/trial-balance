@@ -87,6 +87,25 @@
       ],
       "execution_time": "3-5 minutes",
       "status": "planned"
+    },
+    {
+      "id": "monthly_consolidation",
+      "name": "Monthly Month-End Data Consolidation",
+      "file": "monthly_month_end_data_conso.ipynb",
+      "description": "Loads all files from target folder, consolidates target columns, extracts unique data, and creates a monthly column for month-end data consolidation and reporting.",
+      "parameters": ["year", "month", "input_location", "output_location"],
+      "outputs": [
+        {
+          "name": "Monthly_Consolidation_{date}.xlsx",
+          "description": "Consolidated monthly data with unique records",
+          "location": "data/processed/Monthly Consolidation/"
+        }
+      ],
+      "requires": [
+        "Source data files in target folder"
+      ],
+      "execution_time": "1-2 minutes",
+      "status": "active"
     }
   ],
   "version": "1.0",

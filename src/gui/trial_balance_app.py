@@ -38,6 +38,9 @@ class TrialBalanceApp:
         self.notebook_registry = self.load_notebook_registry()
         self.selected_notebook = tk.StringVar()
         
+        # View mode: 'tabbed' or 'classic'
+        self.view_mode = tk.StringVar(value='tabbed')
+        
         # Setup logging to capture in GUI
         self.log_stream = StringIO()
         self.setup_logging()
@@ -82,9 +85,20 @@ class TrialBalanceApp:
                                font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, sticky=tk.W)
         
+        # View mode toggle button
+        self.view_toggle_btn = ttk.Button(title_frame, text="🔄 Switch to Classic View",
+                                         command=self.toggle_view_mode, width=25)
+        self.view_toggle_btn.grid(row=0, column=1, padx=20, sticky=tk.E)
+        
+        title_frame.columnconfigure(1, weight=1)
+        
+        # Main content container
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
         # Create tabbed interface
-        self.tab_control = ttk.Notebook(self.root)
-        self.tab_control.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.tab_control = ttk.Notebook(self.main_container)
+        self.tab_control.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Tab 1: Process Reports (existing functionality)
         self.tab1 = ttk.Frame(self.tab_control)
@@ -101,6 +115,8 @@ class TrialBalanceApp:
         # Configure grid weights for resizing
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
+        self.main_container.columnconfigure(0, weight=1)
+        self.main_container.rowconfigure(0, weight=1)
     
     def create_process_tab(self):
         """Create widgets for Process Reports tab (existing functionality)"""
@@ -358,6 +374,170 @@ class TrialBalanceApp:
         self.on_year_selected(event)
         # Update month combo in notebook tab
         self.nb_month_combo['values'] = self.month_combo['values']
+    
+    def toggle_view_mode(self):
+        """Toggle between tabbed and classic view"""
+        current_mode = self.view_mode.get()
+        
+        if current_mode == 'tabbed':
+            # Switch to classic
+            self.view_mode.set('classic')
+            self.view_toggle_btn.config(text="🔄 Switch to Tabbed View")
+            self.show_classic_view()
+        else:
+            # Switch to tabbed
+            self.view_mode.set('tabbed')
+            self.view_toggle_btn.config(text="🔄 Switch to Classic View")
+            self.show_tabbed_view()
+    
+    def show_classic_view(self):
+        """Show classic single-view layout"""
+        # Hide tabbed interface
+        self.tab_control.grid_remove()
+        
+        # Create or show classic layout
+        if not hasattr(self, 'classic_frame'):
+            self.create_classic_view()
+        else:
+            self.classic_frame.grid()
+    
+    def show_tabbed_view(self):
+        """Show tabbed interface layout"""
+        # Hide classic view
+        if hasattr(self, 'classic_frame'):
+            self.classic_frame.grid_remove()
+        
+        # Show tabbed interface
+        self.tab_control.grid()
+    
+    def create_classic_view(self):
+        """Create classic single-view layout (original design)"""
+        self.classic_frame = ttk.Frame(self.main_container)
+        self.classic_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Folder Selection Frame
+        selection_frame = ttk.LabelFrame(self.classic_frame, text="Select Data Folder", padding="10")
+        selection_frame.grid(row=0, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        # Year selection
+        ttk.Label(selection_frame, text="Year:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        classic_year_combo = ttk.Combobox(selection_frame, textvariable=self.selected_year,
+                                          state='readonly', width=30)
+        classic_year_combo.grid(row=0, column=1, padx=10, pady=5)
+        classic_year_combo.bind('<<ComboboxSelected>>', self.on_year_selected)
+        classic_year_combo['values'] = self.year_combo['values']
+        if self.selected_year.get():
+            classic_year_combo.set(self.selected_year.get())
+        
+        # Month selection
+        ttk.Label(selection_frame, text="Month:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        classic_month_combo = ttk.Combobox(selection_frame, textvariable=self.selected_month,
+                                           state='readonly', width=30)
+        classic_month_combo.grid(row=1, column=1, padx=10, pady=5)
+        classic_month_combo['values'] = self.month_combo['values']
+        if self.selected_month.get():
+            classic_month_combo.set(self.selected_month.get())
+        
+        # Input location
+        ttk.Label(selection_frame, text="Load Data From:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W, pady=5)
+        classic_input_combo = ttk.Combobox(selection_frame, textvariable=self.input_location,
+                                           state='readonly', width=30)
+        classic_input_combo['values'] = ('Local Storage (Project Folder)', 'Shared Drive (X:\\Trail Balance)')
+        classic_input_combo.grid(row=2, column=1, padx=10, pady=5)
+        classic_input_combo.bind('<<ComboboxSelected>>', self.on_input_location_changed)
+        
+        # Input status
+        classic_input_status = ttk.Label(selection_frame, text=self.input_status_label.cget("text"),
+                                         foreground=self.input_status_label.cget("foreground"), font=('Arial', 9))
+        classic_input_status.grid(row=2, column=2, padx=5, pady=5)
+        
+        # Path display
+        ttk.Label(selection_frame, text="Selected Path:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
+        classic_path_label = ttk.Label(selection_frame, text=self.path_label.cget("text"),
+                                       foreground=self.path_label.cget("foreground"), font=('Arial', 9))
+        classic_path_label.grid(row=3, column=1, sticky=tk.W, padx=10, pady=5)
+        
+        # Output location
+        ttk.Label(selection_frame, text="Save Output To:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky=tk.W, pady=5)
+        classic_output_combo = ttk.Combobox(selection_frame, textvariable=self.output_location,
+                                            state='readonly', width=30)
+        classic_output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
+        classic_output_combo.grid(row=4, column=1, padx=10, pady=5)
+        classic_output_combo.bind('<<ComboboxSelected>>', self.on_output_location_changed)
+        
+        # Output status
+        classic_output_status = ttk.Label(selection_frame, text=self.output_status_label.cget("text"),
+                                          foreground=self.output_status_label.cget("foreground"), font=('Arial', 9))
+        classic_output_status.grid(row=4, column=2, padx=5, pady=5)
+        
+        # Output path
+        classic_output_path = ttk.Label(selection_frame, text=self.output_path_label.cget("text"),
+                                        foreground=self.output_path_label.cget("foreground"), font=('Arial', 9))
+        classic_output_path.grid(row=5, column=1, sticky=tk.W, padx=10, pady=2)
+        
+        # Buttons Frame
+        button_frame = ttk.Frame(self.classic_frame, padding="10")
+        button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        
+        ttk.Button(button_frame, text="📊 Process Report",
+                  command=self.run_notebook_processing,
+                  width=25).grid(row=0, column=0, padx=5)
+        
+        ttk.Button(button_frame, text="📂 Open Results Folder",
+                  command=self.export_results,
+                  width=20).grid(row=0, column=1, padx=5)
+        
+        ttk.Button(button_frame, text="🔄 Refresh",
+                  command=self.load_year_folders, width=15).grid(row=0, column=2, padx=5)
+        
+        ttk.Button(button_frame, text="❌ Exit",
+                  command=self.root.quit, width=15).grid(row=0, column=3, padx=5)
+        
+        # Progress bar
+        classic_progress = ttk.Progressbar(self.classic_frame, mode='indeterminate')
+        classic_progress.grid(row=2, column=0, padx=10, sticky=(tk.W, tk.E))
+        
+        # Reports Frame
+        reports_frame = ttk.LabelFrame(self.classic_frame, text="📊 Generated Reports & COA Mappings", padding="10")
+        reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
+        
+        reports_list_frame = ttk.Frame(reports_frame)
+        reports_list_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        
+        classic_reports_list = tk.Listbox(reports_list_frame, height=5, width=90, font=('Courier', 9))
+        reports_scrollbar = ttk.Scrollbar(reports_list_frame, orient="vertical",
+                                         command=classic_reports_list.yview)
+        classic_reports_list.config(yscrollcommand=reports_scrollbar.set)
+        classic_reports_list.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        reports_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        reports_list_frame.columnconfigure(0, weight=1)
+        
+        # Copy current reports list content
+        for i in range(self.reports_listbox.size()):
+            classic_reports_list.insert(tk.END, self.reports_listbox.get(i))
+        
+        ttk.Button(reports_frame, text="🔄 Refresh Reports List",
+                  command=self.refresh_reports_list, width=20).grid(row=1, column=0, pady=5)
+        
+        # Log Frame
+        log_frame = ttk.LabelFrame(self.classic_frame, text="Processing Log", padding="10")
+        log_frame.grid(row=4, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        log_button_frame = ttk.Frame(log_frame)
+        log_button_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        
+        ttk.Button(log_button_frame, text="🗑️ Clear Log",
+                  command=self.clear_log, width=15).grid(row=0, column=0, padx=5, sticky=tk.W)
+        
+        # Reuse same log_text widget (shared between views)
+        self.log_text.grid_forget()  # Remove from tab1
+        self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), in_=log_frame)
+        
+        # Configure grid weights
+        self.classic_frame.columnconfigure(0, weight=1)
+        self.classic_frame.rowconfigure(4, weight=1)
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(1, weight=1)
         
     def load_year_folders(self):
         """Load available year folders"""
