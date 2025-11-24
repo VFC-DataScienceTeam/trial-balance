@@ -94,6 +94,10 @@ class TrialBalanceApp:
         input_combo.current(0)  # Default to local
         input_combo.bind('<<ComboboxSelected>>', self.on_input_location_changed)
         
+        # Input connection status indicator
+        self.input_status_label = ttk.Label(selection_frame, text="", font=('Arial', 9))
+        self.input_status_label.grid(row=2, column=2, padx=5, pady=5)
+        
         # Path display
         ttk.Label(selection_frame, text="Selected Path:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
         self.path_label = ttk.Label(selection_frame, text="No selection", 
@@ -109,6 +113,10 @@ class TrialBalanceApp:
         output_combo.grid(row=4, column=1, padx=10, pady=5)
         output_combo.current(0)  # Default to shared drive
         output_combo.bind('<<ComboboxSelected>>', self.on_output_location_changed)
+        
+        # Output connection status indicator
+        self.output_status_label = ttk.Label(selection_frame, text="", font=('Arial', 9))
+        self.output_status_label.grid(row=4, column=2, padx=5, pady=5)
         
         # Output path display
         self.output_path_label = ttk.Label(selection_frame, text="X:\\Trail Balance\\data\\processed\\Trail Balance\\", 
@@ -188,6 +196,11 @@ class TrialBalanceApp:
         # Load initial reports list
         self.refresh_reports_list()
         
+        # Check initial connection status
+        self.check_connection(self.base_path, "input")
+        output_path = "X:/Trail Balance" if "Shared Drive" in self.output_location.get() else str(self.project_root / 'data' / 'processed' / 'Trail Balance')
+        self.check_connection(output_path, "output")
+        
     def load_year_folders(self):
         """Load available year folders"""
         try:
@@ -245,6 +258,29 @@ class TrialBalanceApp:
             self.path_label.config(text="No selection", foreground='gray')
             self.process_button.config(state='disabled')
     
+    def check_connection(self, path, location_type="input"):
+        """Check if a path is accessible and update status indicator"""
+        try:
+            path_obj = Path(path)
+            if path_obj.exists():
+                if location_type == "input":
+                    self.input_status_label.config(text="✓ Connected", foreground='green')
+                else:
+                    self.output_status_label.config(text="✓ Connected", foreground='green')
+                return True
+            else:
+                if location_type == "input":
+                    self.input_status_label.config(text="✗ Not Found", foreground='orange')
+                else:
+                    self.output_status_label.config(text="✗ Not Found", foreground='orange')
+                return False
+        except Exception as e:
+            if location_type == "input":
+                self.input_status_label.config(text="✗ No Access", foreground='red')
+            else:
+                self.output_status_label.config(text="✗ No Access", foreground='red')
+            return False
+    
     def on_output_location_changed(self, event):
         """Handle output location selection change"""
         selection = self.output_location.get()
@@ -253,10 +289,21 @@ class TrialBalanceApp:
             output_path = "X:\\Trail Balance\\data\\processed\\Trail Balance\\"
             self.output_path_label.config(text=output_path, foreground='blue')
             self.log_message("💾 Output will be saved to: Shared Drive", 'INFO')
+            # Check connection
+            base_path = "X:/Trail Balance"
+            if self.check_connection(base_path, "output"):
+                self.log_message("  ✓ Shared drive is accessible", 'INFO')
+            else:
+                self.log_message("  ⚠️ WARNING: Shared drive not accessible!", 'WARNING')
         else:
             output_path = str(self.project_root / 'data' / 'processed' / 'Trail Balance')
             self.output_path_label.config(text=output_path, foreground='green')
             self.log_message("💾 Output will be saved to: Local Storage", 'INFO')
+            # Check connection
+            if self.check_connection(output_path, "output"):
+                self.log_message("  ✓ Local storage is accessible", 'INFO')
+            else:
+                self.log_message("  ⚠️ WARNING: Local path not accessible!", 'WARNING')
         
         # Refresh reports list to show files from new location
         self.refresh_reports_list()
@@ -268,9 +315,20 @@ class TrialBalanceApp:
         if "Shared Drive" in selection:
             self.base_path = Path("X:/Trail Balance/data/raw/Trial Balance")
             self.log_message("📂 Input data will be loaded from: Shared Drive", 'INFO')
+            # Check connection
+            base_path = "X:/Trail Balance"
+            if self.check_connection(base_path, "input"):
+                self.log_message("  ✓ Shared drive is accessible", 'INFO')
+            else:
+                self.log_message("  ⚠️ WARNING: Shared drive not accessible! Check network connection.", 'WARNING')
         else:
             self.base_path = self.project_root / 'data' / 'raw' / 'Trial Balance'
             self.log_message("📂 Input data will be loaded from: Local Storage", 'INFO')
+            # Check connection
+            if self.check_connection(self.base_path, "input"):
+                self.log_message("  ✓ Local storage is accessible", 'INFO')
+            else:
+                self.log_message("  ⚠️ WARNING: Local path not accessible!", 'WARNING')
         
         # Reload year and month folders from new location
         self.load_year_folders()
