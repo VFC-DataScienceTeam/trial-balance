@@ -1,0 +1,94 @@
+{
+  "notebooks": [
+    {
+      "id": "trial_balance_mvp",
+      "name": "Trial Balance MVP",
+      "file": "01-rd-trial-balance-mvp.ipynb",
+      "description": "Loads daily trial balance CSVs from selected month, consolidates data, creates pivot tables (GL Account × Fund), validates GL accounts against COA mapping, identifies new accounts, and exports two comprehensive Excel reports with financial statements and segmented summaries.",
+      "parameters": ["year", "month", "input_location", "output_location"],
+      "outputs": [
+        {
+          "name": "Trial_Balance.xlsx",
+          "description": "Complete financial report with 5 main sheets + 16 fund sheets",
+          "location": "data/processed/Trail Balance/{year}/"
+        },
+        {
+          "name": "Trial Balance Monthly.xlsx",
+          "description": "Segmented summary report with 16 fund sheets",
+          "location": "data/processed/Trail Balance/{year}/"
+        },
+        {
+          "name": "Chart of Accounts Mapping as of {date}.xlsx",
+          "description": "Updated COA mapping with new accounts flagged",
+          "location": "data/references/COA Mapping/"
+        }
+      ],
+      "requires": [
+        "Trial Balance CSVs (MM-DD-YYYY.csv format)",
+        "Chart of Accounts CSV"
+      ],
+      "execution_time": "1-3 minutes",
+      "status": "active"
+    },
+    {
+      "id": "variance_analysis",
+      "name": "Variance Analysis Report",
+      "file": "02-variance-analysis.ipynb",
+      "description": "Analyzes variances between periods, identifies significant changes in account balances, and generates detailed variance reports with explanations and drill-down capabilities.",
+      "parameters": ["year", "month", "comparison_month", "input_location", "output_location"],
+      "outputs": [
+        {
+          "name": "Variance_Analysis_{month}_vs_{comparison}.xlsx",
+          "description": "Detailed variance report with period comparisons",
+          "location": "reports/variance_analysis/"
+        }
+      ],
+      "requires": [
+        "Trial Balance data for current and comparison periods"
+      ],
+      "execution_time": "2-4 minutes",
+      "status": "planned"
+    },
+    {
+      "id": "balance_validation",
+      "name": "Balance Validation Report",
+      "file": "03-balance-validation.ipynb",
+      "description": "Validates that debits equal credits for each fund, checks account balance consistency, identifies out-of-balance conditions, and generates validation reports with reconciliation details.",
+      "parameters": ["year", "month", "input_location", "output_location"],
+      "outputs": [
+        {
+          "name": "Balance_Validation_{date}.xlsx",
+          "description": "Validation report with debit/credit checks and reconciliation",
+          "location": "reports/validation_reports/"
+        }
+      ],
+      "requires": [
+        "Trial Balance CSVs for selected period"
+      ],
+      "execution_time": "1-2 minutes",
+      "status": "planned"
+    },
+    {
+      "id": "reconciliation",
+      "name": "Reconciliation Report",
+      "file": "04-reconciliation.ipynb",
+      "description": "Performs inter-company reconciliation, eliminates duplicate entries, matches transactions across funds, and generates comprehensive reconciliation reports.",
+      "parameters": ["year", "month", "input_location", "output_location"],
+      "outputs": [
+        {
+          "name": "Reconciliation_{date}.xlsx",
+          "description": "Reconciliation report with inter-company eliminations",
+          "location": "reports/reconciliation/"
+        }
+      ],
+      "requires": [
+        "Trial Balance data",
+        "Inter-company transaction mapping"
+      ],
+      "execution_time": "3-5 minutes",
+      "status": "planned"
+    }
+  ],
+  "version": "1.0",
+  "last_updated": "2025-11-24"
+}

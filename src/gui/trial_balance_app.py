@@ -13,6 +13,7 @@ import subprocess
 import threading
 import logging
 from io import StringIO
+import json
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -32,6 +33,10 @@ class TrialBalanceApp:
         self.year_folders = []
         self.month_folders = []
         self.data = None
+        
+        # Load notebook registry
+        self.notebook_registry = self.load_notebook_registry()
+        self.selected_notebook = tk.StringVar()
         
         # Setup logging to capture in GUI
         self.log_stream = StringIO()
@@ -56,8 +61,18 @@ class TrialBalanceApp:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         
+    def load_notebook_registry(self):
+        """Load notebook registry from config file"""
+        registry_path = self.project_root / 'config' / 'notebook_registry.json'
+        try:
+            with open(registry_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"Failed to load notebook registry: {e}")
+            return {"notebooks": []}
+    
     def create_widgets(self):
-        """Create all GUI widgets"""
+        """Create all GUI widgets with tabbed interface"""
         
         # Title
         title_frame = ttk.Frame(self.root, padding="10")
@@ -67,9 +82,32 @@ class TrialBalanceApp:
                                font=('Arial', 16, 'bold'))
         title_label.grid(row=0, column=0, sticky=tk.W)
         
+        # Create tabbed interface
+        self.tab_control = ttk.Notebook(self.root)
+        self.tab_control.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Tab 1: Process Reports (existing functionality)
+        self.tab1 = ttk.Frame(self.tab_control)
+        self.tab_control.add(self.tab1, text='  Process Reports  ')
+        
+        # Tab 2: Notebook Selector (new functionality)
+        self.tab2 = ttk.Frame(self.tab_control)
+        self.tab_control.add(self.tab2, text='  Notebook Selector  ')
+        
+        # Create widgets for each tab
+        self.create_process_tab()
+        self.create_notebook_tab()
+        
+        # Configure grid weights for resizing
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(1, weight=1)
+    
+    def create_process_tab(self):
+        """Create widgets for Process Reports tab (existing functionality)"""
+        
         # Folder Selection Frame
-        selection_frame = ttk.LabelFrame(self.root, text="Select Data Folder", padding="10")
-        selection_frame.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        selection_frame = ttk.LabelFrame(self.tab1, text="Select Data Folder", padding="10")
+        selection_frame.grid(row=0, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
         
         # Year selection
         ttk.Label(selection_frame, text="Year:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -124,8 +162,8 @@ class TrialBalanceApp:
         self.output_path_label.grid(row=5, column=1, sticky=tk.W, padx=10, pady=2)
         
         # Buttons Frame
-        button_frame = ttk.Frame(self.root, padding="10")
-        button_frame.grid(row=2, column=0, sticky=(tk.W, tk.E))
+        button_frame = ttk.Frame(self.tab1, padding="10")
+        button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
         
         # Main action button (large and prominent)
         self.process_button = ttk.Button(button_frame, text="📊 Process Report", 
@@ -146,12 +184,12 @@ class TrialBalanceApp:
                   command=self.root.quit, width=15).grid(row=0, column=3, padx=5)
         
         # Progress bar
-        self.progress = ttk.Progressbar(self.root, mode='indeterminate')
-        self.progress.grid(row=3, column=0, padx=10, sticky=(tk.W, tk.E))
+        self.progress = ttk.Progressbar(self.tab1, mode='indeterminate')
+        self.progress.grid(row=2, column=0, padx=10, sticky=(tk.W, tk.E))
         
         # Generated Reports Frame
-        reports_frame = ttk.LabelFrame(self.root, text="📊 Generated Reports & COA Mappings", padding="10")
-        reports_frame.grid(row=4, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
+        reports_frame = ttk.LabelFrame(self.tab1, text="📊 Generated Reports & COA Mappings", padding="10")
+        reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
         
         # Reports list with scrollbar
         reports_list_frame = ttk.Frame(reports_frame)
@@ -173,8 +211,8 @@ class TrialBalanceApp:
                   command=self.refresh_reports_list, width=20).grid(row=1, column=0, pady=5)
         
         # Status/Log display
-        log_frame = ttk.LabelFrame(self.root, text="Processing Log", padding="10")
-        log_frame.grid(row=5, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame = ttk.LabelFrame(self.tab1, text="Processing Log", padding="10")
+        log_frame.grid(row=4, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Log control buttons
         log_button_frame = ttk.Frame(log_frame)
@@ -187,9 +225,9 @@ class TrialBalanceApp:
                                                   font=('Courier', 9))
         self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configure grid weights for resizing
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(5, weight=1)
+        # Configure grid weights for tab1
+        self.tab1.columnconfigure(0, weight=1)
+        self.tab1.rowconfigure(4, weight=1)
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(1, weight=1)
         
@@ -200,6 +238,126 @@ class TrialBalanceApp:
         self.check_connection(self.base_path, "input")
         output_path = "X:/Trail Balance" if "Shared Drive" in self.output_location.get() else str(self.project_root / 'data' / 'processed' / 'Trail Balance')
         self.check_connection(output_path, "output")
+    
+    def create_notebook_tab(self):
+        """Create widgets for Notebook Selector tab"""
+        
+        # Notebook Selection Frame
+        notebook_frame = ttk.LabelFrame(self.tab2, text="Select Notebook to Execute", padding="10")
+        notebook_frame.grid(row=0, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        # Notebook dropdown
+        ttk.Label(notebook_frame, text="Select Notebook:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
+        
+        # Build notebook list from registry
+        active_notebooks = [nb for nb in self.notebook_registry.get('notebooks', []) if nb.get('status') == 'active']
+        notebook_names = [nb['name'] for nb in active_notebooks]
+        
+        self.notebook_combo = ttk.Combobox(notebook_frame, textvariable=self.selected_notebook,
+                                          state='readonly', width=50)
+        self.notebook_combo['values'] = notebook_names
+        self.notebook_combo.grid(row=0, column=1, padx=10, pady=5)
+        if notebook_names:
+            self.notebook_combo.current(0)
+        self.notebook_combo.bind('<<ComboboxSelected>>', self.on_notebook_selected)
+        
+        # Description Frame
+        desc_frame = ttk.LabelFrame(self.tab2, text="Notebook Description", padding="10")
+        desc_frame.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        self.desc_text = scrolledtext.ScrolledText(desc_frame, height=4, width=90,
+                                                   font=('Arial', 9), wrap=tk.WORD)
+        self.desc_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        self.desc_text.config(state='disabled')
+        
+        # Notebook Details Frame
+        details_frame = ttk.LabelFrame(self.tab2, text="Notebook Details", padding="10")
+        details_frame.grid(row=2, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        # Details labels
+        self.nb_file_label = ttk.Label(details_frame, text="File: -", font=('Arial', 9))
+        self.nb_file_label.grid(row=0, column=0, sticky=tk.W, pady=2)
+        
+        self.nb_exec_time_label = ttk.Label(details_frame, text="Estimated Time: -", font=('Arial', 9))
+        self.nb_exec_time_label.grid(row=1, column=0, sticky=tk.W, pady=2)
+        
+        self.nb_requires_label = ttk.Label(details_frame, text="Requires: -", font=('Arial', 9), wraplength=700)
+        self.nb_requires_label.grid(row=2, column=0, sticky=tk.W, pady=2)
+        
+        # Parameters Frame (reuse year/month/location from tab1)
+        params_frame = ttk.LabelFrame(self.tab2, text="Parameters", padding="10")
+        params_frame.grid(row=3, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        # Year
+        ttk.Label(params_frame, text="Year:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.nb_year_combo = ttk.Combobox(params_frame, textvariable=self.selected_year,
+                                          state='readonly', width=15)
+        self.nb_year_combo.grid(row=0, column=1, padx=10, pady=5)
+        self.nb_year_combo['values'] = self.year_combo['values']
+        self.nb_year_combo.bind('<<ComboboxSelected>>', self.on_nb_year_selected)
+        
+        # Month
+        ttk.Label(params_frame, text="Month:", font=('Arial', 10)).grid(row=0, column=2, sticky=tk.W, pady=5, padx=(20, 0))
+        self.nb_month_combo = ttk.Combobox(params_frame, textvariable=self.selected_month,
+                                           state='readonly', width=15)
+        self.nb_month_combo.grid(row=0, column=3, padx=10, pady=5)
+        
+        # Input location
+        ttk.Label(params_frame, text="Load Data From:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        nb_input_combo = ttk.Combobox(params_frame, textvariable=self.input_location,
+                                       state='readonly', width=35)
+        nb_input_combo['values'] = ('Local Storage (Project Folder)', 'Shared Drive (X:\\Trail Balance)')
+        nb_input_combo.grid(row=1, column=1, columnspan=2, padx=10, pady=5, sticky=tk.W)
+        
+        # Input status
+        self.nb_input_status = ttk.Label(params_frame, text="", font=('Arial', 9))
+        self.nb_input_status.grid(row=1, column=3, padx=5, pady=5)
+        
+        # Output location
+        ttk.Label(params_frame, text="Save Output To:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        nb_output_combo = ttk.Combobox(params_frame, textvariable=self.output_location,
+                                        state='readonly', width=35)
+        nb_output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
+        nb_output_combo.grid(row=2, column=1, columnspan=2, padx=10, pady=5, sticky=tk.W)
+        
+        # Output status
+        self.nb_output_status = ttk.Label(params_frame, text="", font=('Arial', 9))
+        self.nb_output_status.grid(row=2, column=3, padx=5, pady=5)
+        
+        # Outputs Frame
+        outputs_frame = ttk.LabelFrame(self.tab2, text="Expected Outputs", padding="10")
+        outputs_frame.grid(row=4, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
+        
+        self.outputs_text = scrolledtext.ScrolledText(outputs_frame, height=3, width=90,
+                                                      font=('Courier', 9), wrap=tk.WORD)
+        self.outputs_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        self.outputs_text.config(state='disabled')
+        
+        # Run Button
+        run_frame = ttk.Frame(self.tab2, padding="10")
+        run_frame.grid(row=5, column=0, sticky=(tk.W, tk.E))
+        
+        self.nb_run_button = ttk.Button(run_frame, text="▶ Run Selected Notebook", 
+                                        command=self.run_selected_notebook,
+                                        width=30)
+        self.nb_run_button.grid(row=0, column=0, padx=5)
+        
+        # Status display
+        self.nb_status_label = ttk.Label(run_frame, text="Ready", font=('Arial', 9), foreground='gray')
+        self.nb_status_label.grid(row=0, column=1, padx=20)
+        
+        # Configure grid weights for tab2
+        self.tab2.columnconfigure(0, weight=1)
+        
+        # Load first notebook details
+        if notebook_names:
+            self.on_notebook_selected(None)
+        
+    def on_nb_year_selected(self, event):
+        """Handle year selection in notebook tab"""
+        self.on_year_selected(event)
+        # Update month combo in notebook tab
+        self.nb_month_combo['values'] = self.month_combo['values']
         
     def load_year_folders(self):
         """Load available year folders"""
@@ -218,8 +376,14 @@ class TrialBalanceApp:
                 return
             
             self.year_combo['values'] = self.year_folders
+            # Also update notebook tab year combo if it exists
+            if hasattr(self, 'nb_year_combo'):
+                self.nb_year_combo['values'] = self.year_folders
+            
             if self.year_folders:
                 self.year_combo.current(0)  # Select first (latest) year
+                if hasattr(self, 'nb_year_combo'):
+                    self.nb_year_combo.current(0)
                 self.on_year_selected(None)
             
             self.log_message(f"✓ Found {len(self.year_folders)} year folders", 'INFO')
@@ -239,8 +403,14 @@ class TrialBalanceApp:
                                     reverse=True)
         
         self.month_combo['values'] = self.month_folders
+        # Also update notebook tab month combo if it exists
+        if hasattr(self, 'nb_month_combo'):
+            self.nb_month_combo['values'] = self.month_folders
+        
         if self.month_folders:
             self.month_combo.current(0)  # Select first (latest) month
+            if hasattr(self, 'nb_month_combo'):
+                self.nb_month_combo.current(0)
             self.update_path_display()
         
         self.log_message(f"📅 Year {year} selected - {len(self.month_folders)} months available", 'INFO')
@@ -456,6 +626,113 @@ class TrialBalanceApp:
         """Clear the log display"""
         self.log_text.delete(1.0, tk.END)
         self.log_message("✨ Log cleared", 'INFO')
+    
+    def on_notebook_selected(self, event):
+        """Handle notebook selection - update description and details"""
+        selected_name = self.selected_notebook.get()
+        
+        # Find notebook in registry
+        notebook = None
+        for nb in self.notebook_registry.get('notebooks', []):
+            if nb['name'] == selected_name:
+                notebook = nb
+                break
+        
+        if not notebook:
+            return
+        
+        # Update description
+        self.desc_text.config(state='normal')
+        self.desc_text.delete(1.0, tk.END)
+        self.desc_text.insert(1.0, notebook.get('description', 'No description available'))
+        self.desc_text.config(state='disabled')
+        
+        # Update details
+        self.nb_file_label.config(text=f"File: {notebook.get('file', 'N/A')}")
+        self.nb_exec_time_label.config(text=f"Estimated Time: {notebook.get('execution_time', 'N/A')}")
+        
+        requires = notebook.get('requires', [])
+        requires_text = "Requires: " + ", ".join(requires) if requires else "Requires: None"
+        self.nb_requires_label.config(text=requires_text)
+        
+        # Update outputs
+        self.outputs_text.config(state='normal')
+        self.outputs_text.delete(1.0, tk.END)
+        
+        outputs = notebook.get('outputs', [])
+        if outputs:
+            for i, output in enumerate(outputs, 1):
+                output_name = output.get('name', 'Unknown')
+                output_desc = output.get('description', '')
+                output_loc = output.get('location', '')
+                self.outputs_text.insert(tk.END, f"{i}. {output_name}\n")
+                self.outputs_text.insert(tk.END, f"   {output_desc}\n")
+                self.outputs_text.insert(tk.END, f"   📂 {output_loc}\n")
+                if i < len(outputs):
+                    self.outputs_text.insert(tk.END, "\n")
+        else:
+            self.outputs_text.insert(tk.END, "No outputs defined")
+        
+        self.outputs_text.config(state='disabled')
+        
+        # Update status based on notebook status
+        status = notebook.get('status', 'unknown')
+        if status == 'active':
+            self.nb_status_label.config(text="✅ Ready to run", foreground='green')
+            self.nb_run_button.config(state='normal')
+        elif status == 'planned':
+            self.nb_status_label.config(text="⏳ Planned (not yet implemented)", foreground='orange')
+            self.nb_run_button.config(state='disabled')
+        else:
+            self.nb_status_label.config(text="❓ Status unknown", foreground='gray')
+            self.nb_run_button.config(state='disabled')
+        
+        # Update connection status in notebook tab
+        self.nb_input_status.config(text=self.input_status_label.cget("text"), 
+                                    foreground=self.input_status_label.cget("foreground"))
+        self.nb_output_status.config(text=self.output_status_label.cget("text"),
+                                     foreground=self.output_status_label.cget("foreground"))
+    
+    def run_selected_notebook(self):
+        """Run the selected notebook from the notebook selector tab"""
+        selected_name = self.selected_notebook.get()
+        
+        if not selected_name:
+            messagebox.showwarning("Warning", "Please select a notebook")
+            return
+        
+        # Find notebook in registry
+        notebook = None
+        for nb in self.notebook_registry.get('notebooks', []):
+            if nb['name'] == selected_name:
+                notebook = nb
+                break
+        
+        if not notebook:
+            messagebox.showerror("Error", "Selected notebook not found in registry")
+            return
+        
+        # Check if notebook is active
+        if notebook.get('status') != 'active':
+            messagebox.showinfo("Info", f"This notebook is not yet implemented.\n\nStatus: {notebook.get('status', 'unknown')}")
+            return
+        
+        # Validate parameters
+        year = self.selected_year.get()
+        month = self.selected_month.get()
+        
+        if not year or not month:
+            messagebox.showwarning("Warning", "Please select both year and month")
+            return
+        
+        # For now, route to existing processing (only Trial Balance MVP is active)
+        notebook_file = notebook.get('file', '')
+        if notebook_file == '01-rd-trial-balance-mvp.ipynb':
+            # Switch to tab 1 and run
+            self.tab_control.select(0)
+            self.run_notebook_processing()
+        else:
+            messagebox.showinfo("Info", f"Execution for '{selected_name}' will be implemented soon!")
     
     def run_notebook_processing(self):
         """Run the full notebook processing - writes config file for notebook to read"""
