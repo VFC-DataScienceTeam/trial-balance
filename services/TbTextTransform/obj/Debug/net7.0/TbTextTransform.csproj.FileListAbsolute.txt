@@ -1,0 +1,15 @@
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\bin\Debug\net7.0\TbTextTransform.exe
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\bin\Debug\net7.0\TbTextTransform.deps.json
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\bin\Debug\net7.0\TbTextTransform.runtimeconfig.json
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\bin\Debug\net7.0\TbTextTransform.dll
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\bin\Debug\net7.0\TbTextTransform.pdb
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.GeneratedMSBuildEditorConfig.editorconfig
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.AssemblyInfoInputs.cache
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.AssemblyInfo.cs
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.csproj.CoreCompileInputs.cache
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.sourcelink.json
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.dll
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\refint\TbTextTransform.dll
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.pdb
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\TbTextTransform.genruntimeconfig.cache
+D:\UserProfile\Documents\@ VFC\pemi-automation\trial-balance\services\TbTextTransform\obj\Debug\net7.0\ref\TbTextTransform.dll

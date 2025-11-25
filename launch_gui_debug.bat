@@ -1,22 +1,21 @@
 @echo off
-REM Quick launcher for Trial Balance GUI
-REM This file stays in the root for easy access
-
+REM Debug launcher for PEMI Report Automation (keeps console open)
 cd /d "%~dp0"
-
-REM Activate virtual environment if it exists
+echo Working directory: %CD%
 if exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
+    echo Activated .venv
+) else (
+    echo .venv not found or missing activate.bat
 )
 
-REM Prefer venv pythonw if available, fall back to system pythonw or python
+REM Determine python executable to use (prefer venv pythonw)
 set PYEXEC=
 if exist "%~dp0.venv\Scripts\pythonw.exe" (
     set PYEXEC="%~dp0.venv\Scripts\pythonw.exe"
 ) else if exist "%~dp0.venv\Scripts\python.exe" (
     set PYEXEC="%~dp0.venv\Scripts\python.exe"
 ) else (
-    REM try system pythonw
     where pythonw.exe >nul 2>&1
     if %ERRORLEVEL%==0 (
         set PYEXEC=pythonw.exe
@@ -33,7 +32,9 @@ if exist "%~dp0.venv\Scripts\pythonw.exe" (
 )
 
 echo Using Python: %PYEXEC%
-REM Launch GUI (use start so it doesn't block)
-start "Trial Balance Processor" %PYEXEC% "%~dp0src\gui\trial_balance_app.py"
 
-exit /b 0
+echo Launching GUI now...
+%PYEXEC% "%~dp0src\gui\trial_balance_app.py"
+
+echo GUI process exited with ERRORLEVEL=%ERRORLEVEL%
+pause

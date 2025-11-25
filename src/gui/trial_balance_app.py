@@ -5,7 +5,7 @@ This app runs the full notebook (01-rd-trial-balance-mvp.ipynb) using papermill.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -14,15 +14,19 @@ import threading
 import logging
 from io import StringIO
 import json
+import shutil
+import time
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from orchestration.executor_dispatcher import ExecutorDispatcher
 
 class TrialBalanceApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Trial Balance Data Processor")
-        self.root.geometry("800x600")
+        self.root.geometry("1000x800")
         self.root.resizable(True, True)
         
         # Variables - use absolute paths from project root
@@ -37,6 +41,27 @@ class TrialBalanceApp:
         # Load notebook registry
         self.notebook_registry = self.load_notebook_registry()
         self.selected_notebook = tk.StringVar()
+        # Load report registry to get POC defaults
+        try:
+            reg_path = self.project_root / 'config' / 'report_registry.json'
+            if reg_path.exists():
+                with open(reg_path, 'r', encoding='utf-8') as f:
+                    reg = json.load(f)
+                    reports = reg.get('reports', [])
+                    poc = next((r for r in reports if r.get('id') == 'tb_text_upper'), {})
+                    poc_params = poc.get('parameters', {})
+                    default_poc_input = poc_params.get('input_path', '')
+                    default_poc_output = poc_params.get('output_path', '')
+            else:
+                default_poc_input = 'data/raw/sample_texts'
+                default_poc_output = 'data/processed/TbTextTransform/out_upper'
+        except Exception:
+            default_poc_input = 'data/raw/sample_texts'
+            default_poc_output = 'data/processed/TbTextTransform/out_upper'
+
+        # POC path variables
+        self.poc_input_var = tk.StringVar(value=str(default_poc_input))
+        self.poc_output_var = tk.StringVar(value=str(default_poc_output))
         
         # Setup logging to capture in GUI
         self.log_stream = StringIO()
@@ -189,20 +214,49 @@ class TrialBalanceApp:
         ttk.Button(button_frame, text="❌ Exit", 
                   command=self.root.quit, width=15).grid(row=0, column=3, padx=5)
         
+        # POC Dotnet Integration Frame
+        poc_frame = ttk.LabelFrame(self.tab1, text="POC: Dotnet Integration", padding="10")
+        poc_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=(5, 0))
+
+        self.dotnet_run_button = ttk.Button(poc_frame, text="▶ Run Dotnet POC (Uppercase)",
+                            command=self.run_dotnet_poc_gui, width=30)
+        self.dotnet_run_button.grid(row=0, column=0, padx=5)
+
+        self.dotnet_export_button = ttk.Button(poc_frame, text="📦 Export POC Output (zip)",
+                               command=self.export_poc_results, width=30, state='disabled')
+        self.dotnet_export_button.grid(row=0, column=1, padx=5)
+
+        # POC parameter editor (input/output) below buttons
+        poc_params_frame = ttk.Frame(poc_frame)
+        poc_params_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(8, 0))
+
+        ttk.Label(poc_params_frame, text="Input Path:", font=('Arial', 9)).grid(row=0, column=0, sticky=tk.W)
+        self.poc_input_entry = ttk.Entry(poc_params_frame, textvariable=self.poc_input_var, width=80)
+        self.poc_input_entry.grid(row=0, column=1, padx=6, sticky=(tk.W, tk.E))
+        ttk.Button(poc_params_frame, text="Browse...", command=self.browse_poc_input, width=12).grid(row=0, column=2, padx=4)
+
+        ttk.Label(poc_params_frame, text="Output Path:", font=('Arial', 9)).grid(row=1, column=0, sticky=tk.W, pady=(6,0))
+        self.poc_output_entry = ttk.Entry(poc_params_frame, textvariable=self.poc_output_var, width=80)
+        self.poc_output_entry.grid(row=1, column=1, padx=6, sticky=(tk.W, tk.E), pady=(6,0))
+        ttk.Button(poc_params_frame, text="Browse...", command=self.browse_poc_output, width=12).grid(row=1, column=2, padx=4, pady=(6,0))
+
+        poc_params_frame.columnconfigure(1, weight=1)
+
         # Progress bar
         self.progress = ttk.Progressbar(self.tab1, mode='indeterminate')
-        self.progress.grid(row=2, column=0, padx=10, sticky=(tk.W, tk.E))
+        self.progress.grid(row=3, column=0, padx=10, sticky=(tk.W, tk.E))
         
         # Generated Reports Frame
-        reports_frame = ttk.LabelFrame(self.tab1, text="📊 Generated Reports & COA Mappings", padding="10")
-        reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
+        reports_frame = ttk.LabelFrame(self.tab1, text="Generated Report and Mappings/References", padding="10")
+        reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Reports list with scrollbar
         reports_list_frame = ttk.Frame(reports_frame)
         reports_list_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
-        self.reports_listbox = tk.Listbox(reports_list_frame, height=5, width=90,
-                                          font=('Courier', 9))
+        # Make the list larger and more visible for generated reports
+        self.reports_listbox = tk.Listbox(reports_list_frame, height=12, width=110,
+                          font=('Courier', 9))
         reports_scrollbar = ttk.Scrollbar(reports_list_frame, orient="vertical",
                                          command=self.reports_listbox.yview)
         self.reports_listbox.config(yscrollcommand=reports_scrollbar.set)
@@ -239,6 +293,11 @@ class TrialBalanceApp:
         
         # Load initial reports list
         self.refresh_reports_list()
+
+        # Allow the reports frame to expand so the list is clearly visible
+        self.tab1.rowconfigure(3, weight=2)
+        reports_frame.columnconfigure(0, weight=1)
+        reports_frame.rowconfigure(0, weight=1)
         
         # Check initial connection status
         self.check_connection(self.base_path, "input")
@@ -894,6 +953,132 @@ class TrialBalanceApp:
         finally:
             self.progress.stop()
             self.root.after(0, lambda: self.process_button.config(state='normal'))
+
+
+    def run_dotnet_poc_gui(self):
+        """Run the dotnet POC via ExecutorDispatcher and show results in GUI"""
+        # Disable run button while executing
+        self.dotnet_run_button.config(state='disabled')
+        self.log_message("\n🚀 Running Dotnet POC...", 'INFO')
+
+        def _worker():
+            try:
+                # Load registry and find tb_text_upper
+                reg_path = self.project_root / 'config' / 'report_registry.json'
+                if not reg_path.exists():
+                    self.log_message(f"❌ Registry not found: {reg_path}", 'ERROR')
+                    return
+
+                with open(reg_path, 'r', encoding='utf-8') as f:
+                    reg = json.load(f)
+
+                reports = reg.get('reports', [])
+                report = next((r for r in reports if r.get('id') == 'tb_text_upper'), None)
+                if report is None:
+                    self.log_message("❌ tb_text_upper not found in registry", 'ERROR')
+                    return
+
+
+                project_rel = report.get('path')
+                params = report.get('parameters', {})
+                # Prefer GUI-provided paths (user may have edited them)
+                input_path = self.poc_input_var.get() or params.get('input_path')
+                output_path = self.poc_output_var.get() or params.get('output_path')
+
+                ed = ExecutorDispatcher(self.project_root)
+                proj_path = self.project_root / project_rel
+                args = [str(input_path), str(output_path)] if output_path else [str(input_path)]
+
+                self.log_message(f"▶ Executing dotnet project: {proj_path} args={args}", 'INFO')
+                res = ed.run_dotnet_project(proj_path, args)
+
+                self.log_message(f"  returncode: {res.get('returncode')}", 'INFO')
+                if not res.get('ok'):
+                    self.log_message(f"  ERROR: {res.get('stderr') or res.get('error')}", 'ERROR')
+                    self.root.after(0, lambda: messagebox.showerror("Error", "Dotnet POC failed. Check log."))
+                else:
+                    self.log_message("  ✓ Dotnet POC completed", 'INFO')
+                    stdout = res.get('stdout') or ''
+                    # Parse WROTE: lines
+                    wrote_paths = []
+                    for line in (stdout.splitlines()):
+                        if line.strip().upper().startswith('WROTE:'):
+                            p = line.split(':', 1)[1].strip()
+                            wrote_paths.append(p)
+
+                    if wrote_paths:
+                        self.log_message(f"  ✓ Files written: {len(wrote_paths)}", 'INFO')
+                        for p in wrote_paths:
+                            self.log_message(f"    - {p}", 'INFO')
+
+                        # Enable export button
+                        self.root.after(0, lambda: self.dotnet_export_button.config(state='normal'))
+                    else:
+                        self.log_message("  ⚠️  No output files detected from dotnet stdout", 'WARNING')
+
+            except Exception as e:
+                self.log_message(f"❌ ERROR running dotnet POC: {str(e)}", 'ERROR')
+            finally:
+                # Re-enable run button
+                self.root.after(0, lambda: self.dotnet_run_button.config(state='normal'))
+
+        thread = threading.Thread(target=_worker)
+        thread.daemon = True
+        thread.start()
+
+
+    def export_poc_results(self):
+        """Create a zip of the POC outputs and open the folder"""
+        try:
+            # Determine registry output_path for tb_text_upper
+            reg_path = self.project_root / 'config' / 'report_registry.json'
+            if not reg_path.exists():
+                self.log_message(f"❌ Registry not found: {reg_path}", 'ERROR')
+                return
+
+            with open(reg_path, 'r', encoding='utf-8') as f:
+                reg = json.load(f)
+
+            reports = reg.get('reports', [])
+            report = next((r for r in reports if r.get('id') == 'tb_text_upper'), None)
+            if report is None:
+                self.log_message("❌ tb_text_upper not found in registry", 'ERROR')
+                return
+
+            params = report.get('parameters', {})
+            # Prefer GUI override if present
+            output_path = self.poc_output_var.get() or params.get('output_path')
+            outdir = self.project_root / (output_path or 'data/processed/TbTextTransform/out_upper')
+
+            if not outdir.exists():
+                self.log_message(f"⚠️ Output folder not found: {outdir}", 'WARNING')
+                messagebox.showwarning("Warning", f"No outputs found at:\n{outdir}")
+                return
+
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            export_dir = self.project_root / 'data' / 'processed' / 'TbTextTransform' / 'exports'
+            export_dir.mkdir(parents=True, exist_ok=True)
+            archive_name = str(export_dir / f'poc_output_{timestamp}')
+
+            # Make archive (zip)
+            shutil.make_archive(archive_name, 'zip', root_dir=str(outdir))
+            archive_file = archive_name + '.zip'
+
+            self.log_message(f"📦 Created export: {archive_file}", 'INFO')
+
+            # Open folder containing archive
+            if archive_file and Path(archive_file).exists():
+                import os
+                if os.name == 'nt':
+                    subprocess.Popen(f'explorer "{export_dir}"')
+                else:
+                    subprocess.Popen(['xdg-open', str(export_dir)])
+
+                messagebox.showinfo("Export Complete", f"Export created:\n{archive_file}")
+
+        except Exception as e:
+            self.log_message(f"❌ Error exporting POC results: {str(e)}", 'ERROR')
+            messagebox.showerror("Error", f"Failed to export POC outputs:\n{str(e)}")
     
 
     

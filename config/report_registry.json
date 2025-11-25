@@ -146,6 +146,32 @@
       ],
       "execution_time": "3-5 minutes",
       "status": "planned"
+    },
+    {
+      "id": "tb_text_upper",
+      "name": "TB Text Uppercase (dotnet POC)",
+      "description": "Runs the TbTextTransform .NET console app to uppercase text files in a folder.",
+      "category": "integration",
+      "executor": "dotnet",
+      "path": "services/TbTextTransform",
+      "schedule": "manual",
+      "parameters": {
+        "input_path": "data/raw/sample_texts",
+        "output_path": "data/processed/TbTextTransform/out_upper"
+      },
+      "dependencies": [],
+      "outputs": [
+        {
+          "name": "TbTextTransform_Output",
+          "description": "Uppercased text files produced by the dotnet POC",
+          "location": "data/processed/TbTextTransform/out_upper"
+        }
+      ],
+      "requires": [
+        "dotnet runtime"
+      ],
+      "execution_time": "instant",
+      "status": "experimental"
     }
   ],
   "categories": {
