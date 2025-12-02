@@ -1,11 +1,39 @@
 """
-Trial Balance Processing Application
-A GUI application for loading and processing trial balance data.
-This app runs the full notebook (01-rd-trial-balance-mvp.ipynb) using papermill.
+Trial Balance Report Automation GUI
+
+PURPOSE:
+Unified interface for loading trial balance data from year/month folders and executing
+reports via ExecutorFactory (supports both Jupyter notebooks and .NET console apps).
+
+CORE WORKFLOW:
+1. Select data source (Local project folder OR Shared Drive X:/Trail Balance)
+2. Select Year and Month folders containing trial balance CSVs
+3. Choose report from registry (report_registry.json)
+4. Click "Run Selected Report" to execute via background thread
+5. Monitor execution via progress bar and log output
+6. Open results folder after successful completion
+
+OUTPUT STRUCTURE:
+- Monthly Reports: {base_path}/{YEAR}/{MONTH}/Trial_Balance.xlsx
+- Consolidated: {base_path}/{YEAR}/Trial Balance Monthly/Trial Balance Monthly.xlsx
+
+ARCHITECTURE:
+- GUI: tkinter with scrollable canvas (1000x800 fixed window)
+- Execution: ExecutorFactory → NotebookExecutor (papermill) or ConsoleExecutor (.NET)
+- Threading: Background daemon threads keep GUI responsive during execution
+- Configuration: run_config.json (runtime params), report_registry.json (available reports)
+
+CODE ORGANIZATION:
+- Section 1: Initialization (GUI setup, state variables)
+- Section 2: GUI Layout (widgets, frames, scrollbar)
+- Section 3: Event Handlers (year/month selection, validation)
+- Section 4: Action Buttons (run, stop, export, refresh, exit)
+- Section 5: Report Execution Logic (validation, background threading, ExecutorFactory)
+- Section 6: Utility Functions (export folder, logging, connection checks)
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext, filedialog
+from tkinter import ttk, messagebox, scrolledtext
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -19,15 +47,40 @@ import time
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from orchestration.executor_dispatcher import ExecutorDispatcher
 
 class TrialBalanceApp:
+    """
+    Trial Balance Report Automation GUI
+    
+    PURPOSE:
+    Unified interface for loading trial balance data from year/month folders 
+    and executing reports via ExecutorFactory (notebooks or console apps).
+    
+    WORKFLOW:
+    1. User selects data source: Local (project folder) or Shared Drive (X:/Trail Balance)
+    2. User selects Year and Month folders containing trial balance CSVs
+    3. User chooses report from registry (report_registry.json)
+    4. User clicks "Run Selected Report" button
+    5. GUI validates selections and updates run_config.json
+    6. Background thread executes report via ExecutorFactory
+    7. Progress bar shows execution status
+    8. Log window displays execution details
+    9. "Open Results Folder" button enables after successful completion
+    
+    OUTPUT LOCATIONS:
+    - Local: {project}/data/processed/{YEAR}/{MONTH}/
+    - Shared Drive: X:/Trail Balance/data/processed/{YEAR}/{MONTH}/
+    - Consolidated reports go to: {base}/{YEAR}/Trial Balance Monthly/
+    """
+    
+    # ========== SECTION 1: INITIALIZATION ==========
+    
     def __init__(self, root):
+        """Initialize GUI components and state variables"""
         self.root = root
-        self.root.title("Trial Balance Data Processor")
+        self.root.title("PEMI REPORT AUTOMATION by RD")
         self.root.geometry("1000x800")
-        self.root.resizable(True, True)
+        self.root.resizable(False, False)
         
         # Variables - use absolute paths from project root
         self.project_root = Path(__file__).parent.parent.parent
@@ -38,30 +91,14 @@ class TrialBalanceApp:
         self.month_folders = []
         self.data = None
         
-        # Load notebook registry
-        self.notebook_registry = self.load_notebook_registry()
-        self.selected_notebook = tk.StringVar()
-        # Load report registry to get POC defaults
-        try:
-            reg_path = self.project_root / 'config' / 'report_registry.json'
-            if reg_path.exists():
-                with open(reg_path, 'r', encoding='utf-8') as f:
-                    reg = json.load(f)
-                    reports = reg.get('reports', [])
-                    poc = next((r for r in reports if r.get('id') == 'tb_text_upper'), {})
-                    poc_params = poc.get('parameters', {})
-                    default_poc_input = poc_params.get('input_path', '')
-                    default_poc_output = poc_params.get('output_path', '')
-            else:
-                default_poc_input = 'data/raw/sample_texts'
-                default_poc_output = 'data/processed/TbTextTransform/out_upper'
-        except Exception:
-            default_poc_input = 'data/raw/sample_texts'
-            default_poc_output = 'data/processed/TbTextTransform/out_upper'
-
-        # POC path variables
-        self.poc_input_var = tk.StringVar(value=str(default_poc_input))
-        self.poc_output_var = tk.StringVar(value=str(default_poc_output))
+        # Load report registry (supports both notebooks and console apps)
+        self.report_registry = self.load_report_registry()
+        self.selected_report = tk.StringVar()
+        
+        # Execution control
+        self.execution_cancelled = False
+        self.current_thread = None
+        self.last_error_details = None
         
         # Setup logging to capture in GUI
         self.log_stream = StringIO()
@@ -74,27 +111,41 @@ class TrialBalanceApp:
         self.load_year_folders()
         
     def setup_logging(self):
-        """Configure logging to capture output"""
-        self.logger = logging.getLogger('TrialBalanceApp')
+        """Configure logging to capture output to both GUI and file"""
+        self.logger = logging.getLogger('PEMI_Reports')
         self.logger.setLevel(logging.INFO)
         
         # Handler for GUI display
-        handler = logging.StreamHandler(self.log_stream)
-        handler.setLevel(logging.INFO)
+        stream_handler = logging.StreamHandler(self.log_stream)
+        stream_handler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s',
                                      datefmt='%H:%M:%S')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        stream_handler.setFormatter(formatter)
+        self.logger.addHandler(stream_handler)
         
-    def load_notebook_registry(self):
-        """Load notebook registry from config file"""
-        registry_path = self.project_root / 'config' / 'notebook_registry.json'
+        # Handler for file logging
+        log_dir = self.project_root / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f'gui_session_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+        
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        self.logger.addHandler(file_handler)
+        
+        self.log_file_path = log_file
+        print(f"Logging to: {log_file}")
+        
+    def load_report_registry(self):
+        """Load report registry from config file (supports notebooks and console aspps)"""
+        registry_path = self.project_root / 'config' / 'report_registry.json'
         try:
             with open(registry_path, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            self.logger.error(f"Failed to load notebook registry: {e}")
-            return {"notebooks": []}
+            self.logger.error(f"Failed to load report registry: {e}")
+            return {"reports": []}
     
     def create_widgets(self):
         """Create all GUI widgets with tabbed interface"""
@@ -103,160 +154,187 @@ class TrialBalanceApp:
         title_frame = ttk.Frame(self.root, padding="10")
         title_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
-        self.title_label = ttk.Label(title_frame, text="📊 Trial Balance Data Processor",
+        self.title_label = ttk.Label(title_frame, text="📊 PEMI Reports Automation",
                                font=('Arial', 16, 'bold'))
         self.title_label.grid(row=0, column=0, sticky=tk.W)
         
-        # Main content container
+        # ========== SECTION 2: GUI LAYOUT ==========
+        
+        # Main content container with scrollbar
         self.main_container = ttk.Frame(self.root)
         self.main_container.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Create tabbed interface
-        self.tab_control = ttk.Notebook(self.main_container)
-        self.tab_control.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # Create canvas and scrollbar
+        self.canvas = tk.Canvas(self.main_container, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main_container, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
         
-        # Tab 1: Process Reports (existing functionality)
-        self.tab1 = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.tab1, text='  Process Reports  ')
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
         
-        # Tab 2: Notebook Selector (new functionality)
-        self.tab2 = ttk.Frame(self.tab_control)
-        self.tab_control.add(self.tab2, text='  Notebook Selector  ')
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Create widgets for each tab
+        self.canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # Main content frame (single unified interface)
+        self.tab1 = ttk.Frame(self.scrollable_frame)
+        self.tab1.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Create the main interface
         self.create_process_tab()
-        self.create_notebook_tab()
         
         # Configure grid weights for resizing
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
         self.main_container.columnconfigure(0, weight=1)
         self.main_container.rowconfigure(0, weight=1)
+        self.scrollable_frame.columnconfigure(0, weight=1)
+        
+        # Enable mousewheel scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scrolling"""
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
     
     def create_process_tab(self):
-        """Create widgets for Process Reports tab (existing functionality)"""
+        """Create main interface for report processing workflow"""
         
-        # Folder Selection Frame
-        selection_frame = ttk.LabelFrame(self.tab1, text="Select Data Folder", padding="10")
+        # ========== SECTION 1: DATA SELECTION ==========
+        selection_frame = ttk.LabelFrame(self.tab1, text="📁 Step 1: Select Data to Process", padding="10")
         selection_frame.grid(row=0, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
         
-        # Year selection
-        ttk.Label(selection_frame, text="Year:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.year_combo = ttk.Combobox(selection_frame, textvariable=self.selected_year,
-                                       state='readonly', width=30)
-        self.year_combo.grid(row=0, column=1, padx=10, pady=5)
-        self.year_combo.bind('<<ComboboxSelected>>', self.on_year_selected)
-        
-        # Month selection
-        ttk.Label(selection_frame, text="Month:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.month_combo = ttk.Combobox(selection_frame, textvariable=self.selected_month,
-                                        state='readonly', width=30)
-        self.month_combo.grid(row=1, column=1, padx=10, pady=5)
-        
-        # Input data location selection
-        ttk.Label(selection_frame, text="Load Data From:", font=('Arial', 10, 'bold')).grid(row=2, column=0, sticky=tk.W, pady=5)
+        # Input data location (where to load data from)
+        ttk.Label(selection_frame, text="Load Data From:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.input_location = tk.StringVar(value="local")
         input_combo = ttk.Combobox(selection_frame, textvariable=self.input_location,
                                     state='readonly', width=30)
         input_combo['values'] = ('Local Storage (Project Folder)', 'Shared Drive (X:\\Trail Balance)')
-        input_combo.grid(row=2, column=1, padx=10, pady=5)
+        input_combo.grid(row=0, column=1, padx=10, pady=5)
         input_combo.current(0)  # Default to local
         input_combo.bind('<<ComboboxSelected>>', self.on_input_location_changed)
         
-        # Input connection status indicator
+        # Input connection status
         self.input_status_label = ttk.Label(selection_frame, text="", font=('Arial', 9))
-        self.input_status_label.grid(row=2, column=2, padx=5, pady=5)
+        self.input_status_label.grid(row=0, column=2, padx=5, pady=5)
         
-        # Path display
-        ttk.Label(selection_frame, text="Selected Path:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
+        # Year selection
+        ttk.Label(selection_frame, text="Year:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.year_combo = ttk.Combobox(selection_frame, textvariable=self.selected_year,
+                                       state='readonly', width=30)
+        self.year_combo.grid(row=1, column=1, padx=10, pady=5)
+        self.year_combo.bind('<<ComboboxSelected>>', self.on_year_selected)
+        
+        # Month selection
+        ttk.Label(selection_frame, text="Month:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.month_combo = ttk.Combobox(selection_frame, textvariable=self.selected_month,
+                                        state='readonly', width=30)
+        self.month_combo.grid(row=2, column=1, padx=10, pady=5)
+        self.month_combo.bind('<<ComboboxSelected>>', self.update_path_display)
+        
+        # Selected data path display
+        ttk.Label(selection_frame, text="Data Path:", font=('Arial', 10)).grid(row=3, column=0, sticky=tk.W, pady=5)
         self.path_label = ttk.Label(selection_frame, text="No selection", 
                                     foreground='gray', font=('Arial', 9))
         self.path_label.grid(row=3, column=1, sticky=tk.W, padx=10, pady=5)
         
+        # ========== SECTION 2: REPORT SELECTION ==========
+        report_frame = ttk.LabelFrame(self.tab1, text="📊 Step 2: Select Report to Run", padding="10")
+        report_frame.grid(row=1, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
+        
+        # Report selection
+        ttk.Label(report_frame, text="Report:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
+        
+        # Load active reports from registry
+        active_reports = [r for r in self.report_registry.get('reports', []) if r.get('status') in ('active', 'poc')]
+        report_options = [f"{r['name']} [{r.get('executor_type', 'notebook').upper()}]" for r in active_reports]
+        
+        self.selected_report_index = tk.IntVar(value=0)
+        self.report_combo = ttk.Combobox(report_frame, values=report_options,
+                                         state='readonly', width=60)
+        self.report_combo.grid(row=0, column=1, padx=10, pady=5)
+        if report_options:
+            self.report_combo.current(0)
+        self.report_combo.bind('<<ComboboxSelected>>', self.on_report_combo_changed)
+        
+        # Report description
+        self.report_desc_label = ttk.Label(report_frame, text="", 
+                                           font=('Arial', 9), foreground='gray',
+                                           wraplength=700)
+        self.report_desc_label.grid(row=1, column=1, sticky=tk.W, padx=10, pady=2)
+        
+        # ========== SECTION 3: OUTPUT SETTINGS ==========
+        output_frame = ttk.LabelFrame(self.tab1, text="💾 Step 3: Output Settings", padding="10")
+        output_frame.grid(row=2, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
+        
         # Output location selection
-        ttk.Label(selection_frame, text="Save Output To:", font=('Arial', 10, 'bold')).grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Label(output_frame, text="Save Results To:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
         self.output_location = tk.StringVar(value="shared_drive")
-        output_combo = ttk.Combobox(selection_frame, textvariable=self.output_location,
+        output_combo = ttk.Combobox(output_frame, textvariable=self.output_location,
                                      state='readonly', width=30)
         output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
-        output_combo.grid(row=4, column=1, padx=10, pady=5)
+        output_combo.grid(row=0, column=1, padx=10, pady=5)
         output_combo.current(0)  # Default to shared drive
         output_combo.bind('<<ComboboxSelected>>', self.on_output_location_changed)
         
-        # Output connection status indicator
-        self.output_status_label = ttk.Label(selection_frame, text="", font=('Arial', 9))
-        self.output_status_label.grid(row=4, column=2, padx=5, pady=5)
+        # Output connection status
+        self.output_status_label = ttk.Label(output_frame, text="", font=('Arial', 9))
+        self.output_status_label.grid(row=0, column=2, padx=5, pady=5)
         
         # Output path display
-        self.output_path_label = ttk.Label(selection_frame, text="X:\\Trail Balance\\data\\processed\\Trail Balance\\", 
+        self.output_path_label = ttk.Label(output_frame, text="X:\\Trail Balance\\data\\processed\\", 
                                            foreground='blue', font=('Arial', 9))
-        self.output_path_label.grid(row=5, column=1, sticky=tk.W, padx=10, pady=2)
+        self.output_path_label.grid(row=1, column=1, sticky=tk.W, padx=10, pady=2)
         
-        # Buttons Frame
+        # ========== SECTION 4: ACTION BUTTONS ==========
         button_frame = ttk.Frame(self.tab1, padding="10")
-        button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        button_frame.grid(row=3, column=0, sticky=(tk.W, tk.E))
         
-        # Main action button (large and prominent)
-        self.process_button = ttk.Button(button_frame, text="📊 Process Report", 
-                                      command=self.run_notebook_processing, state='disabled',
+        # Main action button (Run Report)
+        self.process_button = ttk.Button(button_frame, text="▶ Run Selected Report", 
+                                      command=self.run_report, state='disabled',
                                       width=25)
         self.process_button.grid(row=0, column=0, padx=5)
         
-        # Secondary buttons
+        # Stop button (initially disabled)
+        self.stop_button = ttk.Button(button_frame, text="⏹ Stop Process",
+                                     command=self.stop_execution, state='disabled',
+                                     width=20)
+        self.stop_button.grid(row=0, column=1, padx=5)
+        
+        # Utility buttons
         self.export_button = ttk.Button(button_frame, text="📂 Open Results Folder", 
                                        command=self.export_results, state='disabled',
                                        width=20)
-        self.export_button.grid(row=0, column=1, padx=5)
+        self.export_button.grid(row=0, column=2, padx=5)
         
         ttk.Button(button_frame, text="🔄 Refresh", 
-                  command=self.load_year_folders, width=15).grid(row=0, column=2, padx=5)
+                  command=self.load_year_folders, width=15).grid(row=0, column=3, padx=5)
+        
+        ttk.Button(button_frame, text="📂 View Logs", 
+                  command=self.open_logs_folder, width=15).grid(row=0, column=4, padx=5)
         
         ttk.Button(button_frame, text="❌ Exit", 
-                  command=self.root.quit, width=15).grid(row=0, column=3, padx=5)
+                  command=self.root.quit, width=15).grid(row=0, column=5, padx=5)
         
-        # POC Dotnet Integration Frame
-        poc_frame = ttk.LabelFrame(self.tab1, text="POC: Dotnet Integration", padding="10")
-        poc_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=(5, 0))
-
-        self.dotnet_run_button = ttk.Button(poc_frame, text="▶ Run Dotnet POC (Uppercase)",
-                            command=self.run_dotnet_poc_gui, width=30)
-        self.dotnet_run_button.grid(row=0, column=0, padx=5)
-
-        self.dotnet_export_button = ttk.Button(poc_frame, text="📦 Export POC Output (zip)",
-                               command=self.export_poc_results, width=30, state='disabled')
-        self.dotnet_export_button.grid(row=0, column=1, padx=5)
-
-        # POC parameter editor (input/output) below buttons
-        poc_params_frame = ttk.Frame(poc_frame)
-        poc_params_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(8, 0))
-
-        ttk.Label(poc_params_frame, text="Input Path:", font=('Arial', 9)).grid(row=0, column=0, sticky=tk.W)
-        self.poc_input_entry = ttk.Entry(poc_params_frame, textvariable=self.poc_input_var, width=80)
-        self.poc_input_entry.grid(row=0, column=1, padx=6, sticky=(tk.W, tk.E))
-        ttk.Button(poc_params_frame, text="Browse...", command=self.browse_poc_input, width=12).grid(row=0, column=2, padx=4)
-
-        ttk.Label(poc_params_frame, text="Output Path:", font=('Arial', 9)).grid(row=1, column=0, sticky=tk.W, pady=(6,0))
-        self.poc_output_entry = ttk.Entry(poc_params_frame, textvariable=self.poc_output_var, width=80)
-        self.poc_output_entry.grid(row=1, column=1, padx=6, sticky=(tk.W, tk.E), pady=(6,0))
-        ttk.Button(poc_params_frame, text="Browse...", command=self.browse_poc_output, width=12).grid(row=1, column=2, padx=4, pady=(6,0))
-
-        poc_params_frame.columnconfigure(1, weight=1)
-
         # Progress bar
         self.progress = ttk.Progressbar(self.tab1, mode='indeterminate')
-        self.progress.grid(row=3, column=0, padx=10, sticky=(tk.W, tk.E))
+        self.progress.grid(row=4, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
         
         # Generated Reports Frame
-        reports_frame = ttk.LabelFrame(self.tab1, text="Generated Report and Mappings/References", padding="10")
-        reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        reports_frame = ttk.LabelFrame(self.tab1, text="📊 Generated Reports & COA Mappings", padding="10")
+        reports_frame.grid(row=5, column=0, padx=10, pady=5, sticky=(tk.W, tk.E))
         
         # Reports list with scrollbar
         reports_list_frame = ttk.Frame(reports_frame)
         reports_list_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
-        # Make the list larger and more visible for generated reports
-        self.reports_listbox = tk.Listbox(reports_list_frame, height=12, width=110,
-                          font=('Courier', 9))
+        self.reports_listbox = tk.Listbox(reports_list_frame, height=8, width=90,
+                                          font=('Courier', 9))
         reports_scrollbar = ttk.Scrollbar(reports_list_frame, orient="vertical",
                                          command=self.reports_listbox.yview)
         self.reports_listbox.config(yscrollcommand=reports_scrollbar.set)
@@ -272,7 +350,7 @@ class TrialBalanceApp:
         
         # Status/Log display
         log_frame = ttk.LabelFrame(self.tab1, text="Processing Log", padding="10")
-        log_frame.grid(row=4, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame.grid(row=6, column=0, padx=10, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Log control buttons
         log_button_frame = ttk.Frame(log_frame)
@@ -281,151 +359,32 @@ class TrialBalanceApp:
         ttk.Button(log_button_frame, text="🗑️ Clear Log", 
                   command=self.clear_log, width=15).grid(row=0, column=0, padx=5, sticky=tk.W)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=10, width=90,
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=90,
                                                   font=('Courier', 9))
         self.log_text.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # Configure grid weights for tab1
         self.tab1.columnconfigure(0, weight=1)
-        self.tab1.rowconfigure(4, weight=1)
+        self.tab1.rowconfigure(6, weight=1)
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(1, weight=1)
         
+        # Initialize first report selection
+        if self.report_combo.get():
+            self.on_report_combo_changed(None)
+        
         # Load initial reports list
         self.refresh_reports_list()
-
-        # Allow the reports frame to expand so the list is clearly visible
-        self.tab1.rowconfigure(3, weight=2)
-        reports_frame.columnconfigure(0, weight=1)
-        reports_frame.rowconfigure(0, weight=1)
         
         # Check initial connection status
         self.check_connection(self.base_path, "input")
         output_path = "X:/Trail Balance" if "Shared Drive" in self.output_location.get() else str(self.project_root / 'data' / 'processed' / 'Trail Balance')
         self.check_connection(output_path, "output")
     
-    def create_notebook_tab(self):
-        """Create widgets for Notebook Selector tab"""
-        
-        # Notebook Selection Frame
-        notebook_frame = ttk.LabelFrame(self.tab2, text="Select Notebook to Execute", padding="10")
-        notebook_frame.grid(row=0, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-        
-        # Notebook dropdown
-        ttk.Label(notebook_frame, text="Select Notebook:", font=('Arial', 10, 'bold')).grid(row=0, column=0, sticky=tk.W, pady=5)
-        
-        # Build notebook list from registry
-        active_notebooks = [nb for nb in self.notebook_registry.get('notebooks', []) if nb.get('status') == 'active']
-        notebook_names = [nb['name'] for nb in active_notebooks]
-        
-        self.notebook_combo = ttk.Combobox(notebook_frame, textvariable=self.selected_notebook,
-                                          state='readonly', width=50)
-        self.notebook_combo['values'] = notebook_names
-        self.notebook_combo.grid(row=0, column=1, padx=10, pady=5)
-        if notebook_names:
-            self.notebook_combo.current(0)
-        self.notebook_combo.bind('<<ComboboxSelected>>', self.on_notebook_selected)
-        
-        # Description Frame
-        desc_frame = ttk.LabelFrame(self.tab2, text="Notebook Description", padding="10")
-        desc_frame.grid(row=1, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-        
-        self.desc_text = scrolledtext.ScrolledText(desc_frame, height=4, width=90,
-                                                   font=('Arial', 9), wrap=tk.WORD)
-        self.desc_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        self.desc_text.config(state='disabled')
-        
-        # Notebook Details Frame
-        details_frame = ttk.LabelFrame(self.tab2, text="Notebook Details", padding="10")
-        details_frame.grid(row=2, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-        
-        # Details labels
-        self.nb_file_label = ttk.Label(details_frame, text="File: -", font=('Arial', 9))
-        self.nb_file_label.grid(row=0, column=0, sticky=tk.W, pady=2)
-        
-        self.nb_exec_time_label = ttk.Label(details_frame, text="Estimated Time: -", font=('Arial', 9))
-        self.nb_exec_time_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-        
-        self.nb_requires_label = ttk.Label(details_frame, text="Requires: -", font=('Arial', 9), wraplength=700)
-        self.nb_requires_label.grid(row=2, column=0, sticky=tk.W, pady=2)
-        
-        # Parameters Frame (reuse year/month/location from tab1)
-        params_frame = ttk.LabelFrame(self.tab2, text="Parameters", padding="10")
-        params_frame.grid(row=3, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-        
-        # Year
-        ttk.Label(params_frame, text="Year:", font=('Arial', 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
-        self.nb_year_combo = ttk.Combobox(params_frame, textvariable=self.selected_year,
-                                          state='readonly', width=15)
-        self.nb_year_combo.grid(row=0, column=1, padx=10, pady=5)
-        self.nb_year_combo['values'] = self.year_combo['values']
-        self.nb_year_combo.bind('<<ComboboxSelected>>', self.on_nb_year_selected)
-        
-        # Month
-        ttk.Label(params_frame, text="Month:", font=('Arial', 10)).grid(row=0, column=2, sticky=tk.W, pady=5, padx=(20, 0))
-        self.nb_month_combo = ttk.Combobox(params_frame, textvariable=self.selected_month,
-                                           state='readonly', width=15)
-        self.nb_month_combo.grid(row=0, column=3, padx=10, pady=5)
-        
-        # Input location
-        ttk.Label(params_frame, text="Load Data From:", font=('Arial', 10)).grid(row=1, column=0, sticky=tk.W, pady=5)
-        nb_input_combo = ttk.Combobox(params_frame, textvariable=self.input_location,
-                                       state='readonly', width=35)
-        nb_input_combo['values'] = ('Local Storage (Project Folder)', 'Shared Drive (X:\\Trail Balance)')
-        nb_input_combo.grid(row=1, column=1, columnspan=2, padx=10, pady=5, sticky=tk.W)
-        
-        # Input status
-        self.nb_input_status = ttk.Label(params_frame, text="", font=('Arial', 9))
-        self.nb_input_status.grid(row=1, column=3, padx=5, pady=5)
-        
-        # Output location
-        ttk.Label(params_frame, text="Save Output To:", font=('Arial', 10)).grid(row=2, column=0, sticky=tk.W, pady=5)
-        nb_output_combo = ttk.Combobox(params_frame, textvariable=self.output_location,
-                                        state='readonly', width=35)
-        nb_output_combo['values'] = ('Shared Drive (X:\\Trail Balance)', 'Local Storage (Project Folder)')
-        nb_output_combo.grid(row=2, column=1, columnspan=2, padx=10, pady=5, sticky=tk.W)
-        
-        # Output status
-        self.nb_output_status = ttk.Label(params_frame, text="", font=('Arial', 9))
-        self.nb_output_status.grid(row=2, column=3, padx=5, pady=5)
-        
-        # Outputs Frame
-        outputs_frame = ttk.LabelFrame(self.tab2, text="Expected Outputs", padding="10")
-        outputs_frame.grid(row=4, column=0, padx=10, pady=10, sticky=(tk.W, tk.E))
-        
-        self.outputs_text = scrolledtext.ScrolledText(outputs_frame, height=3, width=90,
-                                                      font=('Courier', 9), wrap=tk.WORD)
-        self.outputs_text.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        self.outputs_text.config(state='disabled')
-        
-        # Run Button
-        run_frame = ttk.Frame(self.tab2, padding="10")
-        run_frame.grid(row=5, column=0, sticky=(tk.W, tk.E))
-        
-        self.nb_run_button = ttk.Button(run_frame, text="▶ Run Selected Notebook", 
-                                        command=self.run_selected_notebook,
-                                        width=30)
-        self.nb_run_button.grid(row=0, column=0, padx=5)
-        
-        # Status display
-        self.nb_status_label = ttk.Label(run_frame, text="Ready", font=('Arial', 9), foreground='gray')
-        self.nb_status_label.grid(row=0, column=1, padx=20)
-        
-        # Configure grid weights for tab2
-        self.tab2.columnconfigure(0, weight=1)
-        
-        # Load first notebook details
-        if notebook_names:
-            self.on_notebook_selected(None)
-        
-    def on_nb_year_selected(self, event):
-        """Handle year selection in notebook tab"""
-        self.on_year_selected(event)
-        # Update month combo in notebook tab
-        self.nb_month_combo['values'] = self.month_combo['values']
+    # ========== SECTION 3: EVENT HANDLERS AND VALIDATION ==========
     
     def load_year_folders(self):
-        """Load available year folders"""
+        """Load available year folders from selected data source path"""
         try:
             if not self.base_path.exists():
                 self.log_message(f"❌ Base path not found: {self.base_path}", 'ERROR')
@@ -441,14 +400,9 @@ class TrialBalanceApp:
                 return
             
             self.year_combo['values'] = self.year_folders
-            # Also update notebook tab year combo if it exists
-            if hasattr(self, 'nb_year_combo'):
-                self.nb_year_combo['values'] = self.year_folders
             
             if self.year_folders:
                 self.year_combo.current(0)  # Select first (latest) year
-                if hasattr(self, 'nb_year_combo'):
-                    self.nb_year_combo.current(0)
                 self.on_year_selected(None)
             
             self.log_message(f"✓ Found {len(self.year_folders)} year folders", 'INFO')
@@ -468,14 +422,9 @@ class TrialBalanceApp:
                                     reverse=True)
         
         self.month_combo['values'] = self.month_folders
-        # Also update notebook tab month combo if it exists
-        if hasattr(self, 'nb_month_combo'):
-            self.nb_month_combo['values'] = self.month_folders
         
         if self.month_folders:
             self.month_combo.current(0)  # Select first (latest) month
-            if hasattr(self, 'nb_month_combo'):
-                self.nb_month_combo.current(0)
             self.update_path_display()
         
         self.log_message(f"📅 Year {year} selected - {len(self.month_folders)} months available", 'INFO')
@@ -542,6 +491,27 @@ class TrialBalanceApp:
         
         # Refresh reports list to show files from new location
         self.refresh_reports_list()
+    
+    def on_report_combo_changed(self, event):
+        """Handle report selection change in Process Reports tab"""
+        selected_idx = self.report_combo.current()
+        if selected_idx < 0:
+            return
+        
+        # Get selected report from registry
+        active_reports = [r for r in self.report_registry.get('reports', []) if r.get('status') in ('active', 'poc')]
+        if selected_idx < len(active_reports):
+            report = active_reports[selected_idx]
+            
+            # Update description label
+            desc = report.get('description', 'No description available')
+            executor_type = report.get('executor_type', 'notebook').upper()
+            exec_time = report.get('execution_time', 'Unknown')
+            
+            desc_text = f"[{executor_type}] {desc} • Est. Time: {exec_time}"
+            self.report_desc_label.config(text=desc_text, foreground='blue')
+            
+            self.log_message(f"📋 Selected: {report['name']} ({executor_type})", 'INFO')
     
     def on_input_location_changed(self, event):
         """Handle input data location selection change"""
@@ -692,120 +662,316 @@ class TrialBalanceApp:
         self.log_text.delete(1.0, tk.END)
         self.log_message("✨ Log cleared", 'INFO')
     
-    def on_notebook_selected(self, event):
-        """Handle notebook selection - update description and details"""
-        selected_name = self.selected_notebook.get()
-        
-        # Find notebook in registry
-        notebook = None
-        for nb in self.notebook_registry.get('notebooks', []):
-            if nb['name'] == selected_name:
-                notebook = nb
-                break
-        
-        if not notebook:
-            return
-        
-        # Update description
-        self.desc_text.config(state='normal')
-        self.desc_text.delete(1.0, tk.END)
-        self.desc_text.insert(1.0, notebook.get('description', 'No description available'))
-        self.desc_text.config(state='disabled')
-        
-        # Update details
-        self.nb_file_label.config(text=f"File: {notebook.get('file', 'N/A')}")
-        self.nb_exec_time_label.config(text=f"Estimated Time: {notebook.get('execution_time', 'N/A')}")
-        
-        requires = notebook.get('requires', [])
-        requires_text = "Requires: " + ", ".join(requires) if requires else "Requires: None"
-        self.nb_requires_label.config(text=requires_text)
-        
-        # Update outputs
-        self.outputs_text.config(state='normal')
-        self.outputs_text.delete(1.0, tk.END)
-        
-        outputs = notebook.get('outputs', [])
-        if outputs:
-            for i, output in enumerate(outputs, 1):
-                output_name = output.get('name', 'Unknown')
-                output_desc = output.get('description', '')
-                output_loc = output.get('location', '')
-                self.outputs_text.insert(tk.END, f"{i}. {output_name}\n")
-                self.outputs_text.insert(tk.END, f"   {output_desc}\n")
-                self.outputs_text.insert(tk.END, f"   📂 {output_loc}\n")
-                if i < len(outputs):
-                    self.outputs_text.insert(tk.END, "\n")
+    def stop_execution(self):
+        """Stop the currently running execution"""
+        if self.current_thread and self.current_thread.is_alive():
+            self.execution_cancelled = True
+            self.log_message("⚠️  STOP REQUESTED - Cancelling execution...", 'WARNING')
+            # Don't disable stop button here - let the finally block handle all button states
+            
+            # Note: Thread will check self.execution_cancelled flag and exit gracefully
+            messagebox.showinfo(
+                "Stop Requested",
+                "Stop signal sent. The process will terminate as soon as possible.\n\n"
+                "Note: Some operations may need to complete before stopping."
+            )
         else:
-            self.outputs_text.insert(tk.END, "No outputs defined")
-        
-        self.outputs_text.config(state='disabled')
-        
-        # Update status based on notebook status
-        status = notebook.get('status', 'unknown')
-        if status == 'active':
-            self.nb_status_label.config(text="✅ Ready to run", foreground='green')
-            self.nb_run_button.config(state='normal')
-        elif status == 'planned':
-            self.nb_status_label.config(text="⏳ Planned (not yet implemented)", foreground='orange')
-            self.nb_run_button.config(state='disabled')
-        else:
-            self.nb_status_label.config(text="❓ Status unknown", foreground='gray')
-            self.nb_run_button.config(state='disabled')
-        
-        # Update connection status in notebook tab
-        self.nb_input_status.config(text=self.input_status_label.cget("text"), 
-                                    foreground=self.input_status_label.cget("foreground"))
-        self.nb_output_status.config(text=self.output_status_label.cget("text"),
-                                     foreground=self.output_status_label.cget("foreground"))
+            self.log_message("ℹ️  No process is currently running", 'INFO')
     
-    def run_selected_notebook(self):
-        """Run the selected notebook from the notebook selector tab"""
-        selected_name = self.selected_notebook.get()
+    # ========== SECTION 5: REPORT EXECUTION LOGIC ==========
+    
+    def run_report(self):
+        """
+        Execute the selected report with validated year/month/output configuration
         
-        if not selected_name:
-            messagebox.showwarning("Warning", "Please select a notebook")
+        Workflow:
+        1. Validate year/month/report selections
+        2. Update run_config.json with current selections
+        3. Launch background thread for report execution
+        4. Update UI to show progress
+        """
+        print("DEBUG: run_report() CALLED")  # Console debug
+        self.log_message("🔘 Run button clicked", 'INFO')
+        
+        # Get selected report
+        selected_idx = self.report_combo.current()
+        self.log_message(f"Debug: Report combo index = {selected_idx}", 'INFO')
+        
+        if selected_idx < 0:
+            self.log_message("⚠️  No report selected", 'WARNING')
+            messagebox.showwarning("Warning", "Please select a report to run")
             return
         
-        # Find notebook in registry
-        notebook = None
-        for nb in self.notebook_registry.get('notebooks', []):
-            if nb['name'] == selected_name:
-                notebook = nb
-                break
+        active_reports = [r for r in self.report_registry.get('reports', []) if r.get('status') in ('active', 'poc')]
+        self.log_message(f"Debug: Found {len(active_reports)} active reports", 'INFO')
         
-        if not notebook:
-            messagebox.showerror("Error", "Selected notebook not found in registry")
+        if selected_idx >= len(active_reports):
+            self.log_message(f"❌ Invalid selection: index {selected_idx} >= {len(active_reports)}", 'ERROR')
+            messagebox.showerror("Error", "Invalid report selection")
             return
         
-        # Check if notebook is active
-        if notebook.get('status') != 'active':
-            messagebox.showinfo("Info", f"This notebook is not yet implemented.\n\nStatus: {notebook.get('status', 'unknown')}")
-            return
+        report = active_reports[selected_idx]
+        self.log_message(f"Debug: Selected report = {report.get('name', 'Unknown')}", 'INFO')
         
         # Validate parameters
         year = self.selected_year.get()
         month = self.selected_month.get()
+        self.log_message(f"Debug: Year={year}, Month={month}", 'INFO')
         
         if not year or not month:
+            self.log_message("❌ Missing year or month", 'ERROR')
             messagebox.showwarning("Warning", "Please select both year and month")
             return
         
-        # For now, route to existing processing (only Trial Balance MVP is active)
-        notebook_file = notebook.get('file', '')
-        if notebook_file == '01-rd-trial-balance-mvp.ipynb':
-            # Switch to tab 1 and run
-            self.tab_control.select(0)
-            self.run_notebook_processing()
-        else:
-            messagebox.showinfo("Info", f"Execution for '{selected_name}' will be implemented soon!")
+        self.log_message("✓ All validations passed, starting execution...", 'INFO')
+        
+        # Disable run button, enable stop button during execution
+        self.process_button.config(state='disabled')
+        self.stop_button.config(state='normal')
+        self.execution_cancelled = False
+        self.progress.start()
+        self.log_message("✓ Progress bar started", 'INFO')
+        self.log_message("✓ Buttons updated (Run disabled, Stop enabled)", 'INFO')
+        
+        # Execute in background thread
+        thread = threading.Thread(target=self._execute_in_background, args=(report, year, month))
+        self.current_thread = thread
+        thread.daemon = True
+        thread.start()
+        self.log_message(f"✓ Background thread started (Thread ID: {thread.ident})", 'INFO')
+    
+    def _execute_in_background(self, report, year, month):
+        """
+        Background thread: Execute report via ExecutorFactory
+        
+        This runs in a separate daemon thread to keep GUI responsive.
+        Handles both notebook (papermill) and console app execution types.
+        
+        Args:
+            report (dict): Report definition from registry
+            year (str): Selected year folder
+            month (str): Selected month folder
+        
+        Process Flow:
+        1. Import ExecutorFactory
+        2. Validate not cancelled
+        3. Determine output path (Local vs Shared Drive)
+        4. Execute via ExecutorFactory
+        5. Update UI with results
+        """
+        self.log_message("🚀 Background thread started", 'INFO')
+        try:
+            self.log_message("Step 1: Importing ExecutorFactory...", 'INFO')
+            import sys
+            sys.path.insert(0, str(self.project_root))
+            from src.orchestration.executor_factory import ExecutorFactory
+            self.log_message("✓ ExecutorFactory imported", 'INFO')
+            
+            # Check cancellation before starting
+            if self.execution_cancelled:
+                self.log_message("⛔ Execution cancelled before start", 'WARNING')
+                return
+            
+            # Log execution start
+            self.log_message("="*60, 'INFO')
+            self.log_message(f"🚀 STARTING REPORT EXECUTION: {report['name']}", 'INFO')
+            self.log_message("="*60, 'INFO')
+            self.log_message(f"📅 Year: {year}", 'INFO')
+            self.log_message(f"📅 Month: {month}", 'INFO')
+            
+            # Get executor type
+            executor_type = report.get('executor_type', 'notebook')
+            self.log_message(f"🔧 Executor Type: {executor_type.upper()}", 'INFO')
+            
+            # Check cancellation
+            if self.execution_cancelled:
+                self.log_message("⛔ Execution cancelled", 'WARNING')
+                return
+            
+            # Prepare parameters
+            data_path = self.base_path / year / month
+            
+            # Determine output path based on user selection
+            output_selection = self.output_location.get()
+            if "Shared Drive" in output_selection:
+                output_base_path = Path("X:/Trail Balance/data/processed")
+                self.log_message(f"📍 Output destination: Shared Drive (X:/Trail Balance/data/processed)", 'INFO')
+            else:
+                output_base_path = self.project_root / 'data' / 'processed'
+                self.log_message(f"📍 Output destination: Local Storage ({output_base_path})", 'INFO')
+            
+            parameters = {
+                'year': year,
+                'month': month,
+                'data_path': str(data_path),
+                'output_base_path': str(output_base_path)
+            }
+            
+            # Write run_config.json to ensure notebook uses correct paths
+            config_file = self.project_root / 'config' / 'run_config.json'
+            try:
+                with open(config_file, 'w') as f:
+                    json.dump(parameters, f, indent=2)
+                self.log_message(f"✓ Updated run_config.json with current settings", 'INFO')
+                self.log_message(f"   • data_path: {data_path}", 'INFO')
+                self.log_message(f"   • output_base_path: {output_base_path}", 'INFO')
+            except Exception as config_err:
+                self.log_message(f"⚠️  Warning: Could not write config: {config_err}", 'WARNING')
+            
+            # Determine executor path
+            if executor_type == 'console':
+                executor_path = report.get('executor_path')
+            else:
+                executor_path = f"notebooks/{report.get('notebook')}"
+            
+            # Create output path for executed notebooks
+            output_path = str(self.project_root / 'notebooks' / 'executed' / f"{report['id']}_{year}_{month}.ipynb")
+            
+            # Define progress callback
+            def progress_callback(current, total, message):
+                """Callback for progress updates from executor"""
+                pct = int((current / total) * 100) if total > 0 else 0
+                self.log_message(f"📊 Progress: {message}", 'INFO')
+            
+            # Create executor with progress callback
+            executor = ExecutorFactory.create(executor_type, self.project_root, progress_callback)
+            
+            # Check cancellation before execution
+            if self.execution_cancelled:
+                self.log_message("⛔ Execution cancelled", 'WARNING')
+                return
+            
+            self.log_message(f"⚙️  Executing: {executor_path}", 'INFO')
+            self.log_message(f"   Parameters: year={year}, month={month}", 'INFO')
+            self.log_message(f"   Output: {output_path}", 'INFO')
+            self.log_message(f"⏳ Please wait - this may take 1-2 minutes...", 'INFO')
+            
+            # Execute without stdout capture to avoid papermill conflicts
+            try:
+                success = executor.execute(executor_path, parameters, output_path)
+                self.log_message(f"   Executor returned: {success}", 'INFO')
+            except Exception as exec_error:
+                error_msg = str(exec_error)
+                self.log_message(f"   ❌ Executor exception: {error_msg}", 'ERROR')
+                import traceback
+                error_trace = traceback.format_exc()
+                self.log_message(error_trace, 'ERROR')
+                self.last_error_details = f"{error_msg}\n\n{error_trace}"
+                success = False
+            
+            # Check if cancelled during execution
+            if self.execution_cancelled:
+                self.log_message("⛔ Execution was cancelled", 'WARNING')
+                self.root.after(0, lambda: messagebox.showwarning(
+                    "Execution Cancelled",
+                    f"{report['name']} was cancelled by user."
+                ))
+                return
+            
+            if success:
+                self.log_message("="*60, 'INFO')
+                self.log_message("✅ REPORT EXECUTION COMPLETED SUCCESSFULLY!", 'INFO')
+                self.log_message("="*60, 'INFO')
+                
+                # Show output location
+                expected_output = output_base_path / year / month
+                self.log_message(f"📂 Output files saved to:", 'INFO')
+                self.log_message(f"   {expected_output}", 'INFO')
+                
+                # Check if files were actually created
+                if expected_output.exists():
+                    excel_files = list(expected_output.glob('*.xlsx'))
+                    if excel_files:
+                        self.log_message(f"✓ Found {len(excel_files)} Excel file(s):", 'INFO')
+                        for f in excel_files:
+                            size_mb = f.stat().st_size / (1024 * 1024)
+                            self.log_message(f"   • {f.name} ({size_mb:.2f} MB)", 'INFO')
+                    else:
+                        self.log_message(f"⚠️  No Excel files found in output folder", 'WARNING')
+                else:
+                    self.log_message(f"⚠️  Output folder does not exist yet", 'WARNING')
+                
+                # Enable export button
+                self.root.after(0, lambda: self.export_button.config(state='normal'))
+                
+                # Show success message with location
+                location_type = "Shared Drive" if "Shared Drive" in output_selection else "Local Storage"
+                self.root.after(0, lambda: messagebox.showinfo(
+                    "Success",
+                    f"✅ {report['name']} completed successfully!\n\n"
+                    f"📂 Output Location: {location_type}\n"
+                    f"📁 Path: {expected_output}\n\n"
+                    f"Click '📂 Open Results Folder' to view the files."
+                ))
+                
+                # Refresh reports list
+                self.root.after(0, self.refresh_reports_list)
+            else:
+                self.log_message("="*60, 'ERROR')
+                self.log_message("❌ REPORT EXECUTION FAILED!", 'ERROR')
+                self.log_message("="*60, 'ERROR')
+                
+                # Get the last few log lines for error context
+                log_content = self.log_text.get("end-10l", "end")
+                error_lines = [line for line in log_content.split("\n") if "❌" in line or "ERROR" in line or "Traceback" in line]
+                error_summary = "\n".join(error_lines[-5:]) if error_lines else "Check Processing Log below for details"
+                
+                log_location = f"\n\nDetailed log saved to:\n{getattr(self, 'log_file_path', 'logs folder')}"
+                
+                self.root.after(0, lambda: messagebox.showerror(
+                    "Execution Failed",
+                    f"{report['name']} failed to execute.\n\nRecent errors:\n{error_summary}{log_location}\n\nClick 'View Logs' button to open logs folder."
+                ))
+        
+        except Exception as e:
+            self.log_message(f"❌ EXCEPTION: {str(e)}", 'ERROR')
+            import traceback
+            self.log_message(traceback.format_exc(), 'ERROR')
+            
+            self.root.after(0, lambda: messagebox.showerror(
+                "Error",
+                f"Failed to execute report:\n{str(e)}"
+            ))
+        
+        finally:
+            # Re-enable run button, disable stop button, stop progress
+            self.root.after(0, lambda: self.process_button.config(state='normal'))
+            self.root.after(0, lambda: self.stop_button.config(state='disabled'))
+            self.root.after(0, self.progress.stop)
+            self.execution_cancelled = False
+            self.current_thread = None
     
     def run_notebook_processing(self):
-        """Run the full notebook processing - writes config file for notebook to read"""
+        """Run the selected report from Process Reports tab - uses ExecutorFactory"""
         year = self.selected_year.get()
         month = self.selected_month.get()
         
         if not year or not month:
             messagebox.showwarning("Warning", "Please select both year and month")
+            return
+        
+        # Check if a report is selected in Report Selector
+        selected_name = self.selected_report.get()
+        
+        if not selected_name:
+            messagebox.showwarning(
+                "No Report Selected",
+                "Please select a report first:\n\n" +
+                "1. Go to 'Report Selector' tab\n" +
+                "2. Choose a report from the dropdown\n" +
+                "3. Return here to run it"
+            )
+            return
+        
+        # Find report in registry
+        report = None
+        for r in self.report_registry.get('reports', []):
+            if r['name'] == selected_name:
+                report = r
+                break
+        
+        if not report:
+            messagebox.showerror("Error", "Selected report not found in registry")
             return
         
         # Disable button during processing
@@ -843,259 +1009,77 @@ class TrialBalanceApp:
                 self.process_button.config(state='normal')
                 return
         
-        # Determine output path based on user selection
-        selection = self.output_location.get()
-        if "Shared Drive" in selection:
-            output_base_path = "X:\\Trail Balance\\data\\processed\\Trail Balance"
-            self.log_message(f"💾 Output Location: Shared Drive", 'INFO')
-        else:
-            output_base_path = str(self.project_root / 'data' / 'processed' / 'Trail Balance')
-            self.log_message(f"💾 Output Location: Local Storage", 'INFO')
-        
-        # Write config file for notebook to read (with absolute path)
-        import json
-        config_path = self.project_root / 'config' / 'run_config.json'
-        config_path.parent.mkdir(exist_ok=True)
-        config = {
-            'year': year,
-            'month': month,
-            'data_path': str(data_path),  # Absolute input path
-            'output_base_path': output_base_path  # Output location
-        }
-        config_path.write_text(json.dumps(config, indent=2))
-        self.log_message(f"📝 Config written: {config_path.name}", 'INFO')
-        self.log_message(f"   Input Path: {data_path}", 'INFO')
-        self.log_message(f"   Output Path: {output_base_path}\\{year}\\", 'INFO')
-        
-        # Run in a separate thread to avoid freezing the GUI
-        thread = threading.Thread(target=self._execute_notebook, args=(year, month))
+        # Execute report in background thread using ExecutorFactory
+        thread = threading.Thread(
+            target=self._execute_in_background, 
+            args=(report, year, month)
+        )
         thread.daemon = True
         thread.start()
     
-    def _execute_notebook(self, year, month):
-        """Execute notebook in background thread"""
-        self.progress.start()
-        
-        try:
-            # Paths - use absolute paths from project root
-            notebook_path = self.project_root / 'notebooks' / '01-rd-trial-balance-mvp.ipynb'
-            output_dir = self.project_root / 'notebooks' / 'executed_trial_balance_reports'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = output_dir / f"trial_balance_report_{timestamp}.ipynb"
-            
-            self.log_message(f"\n📓 Notebook: {notebook_path}", 'INFO')
-            self.log_message(f"💾 Output: {output_path}", 'INFO')
-            self.log_message("\n⚙️  Executing notebook (this may take a few minutes)...", 'INFO')
-            
-            # Execute notebook with papermill (no parameters - reads config file instead)
-            cmd = [
-                'papermill',
-                str(notebook_path),
-                str(output_path)
-            ]
-            
-            self.log_message(f"\n📝 Command: {' '.join(cmd)}", 'INFO')
-            self.log_message("\n" + "-"*60, 'INFO')
-            
-            # Run papermill and capture output
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
-            
-            # Stream output to log
-            for line in iter(process.stdout.readline, ''):
-                if line.strip():
-                    self.log_message(line.strip(), 'INFO')
-            
-            process.wait()
-            
-            if process.returncode == 0:
-                self.log_message("\n" + "="*60, 'INFO')
-                self.log_message("✅ NOTEBOOK EXECUTION COMPLETE", 'INFO')
-                self.log_message("="*60, 'INFO')
-                self.log_message(f"\n📊 Executed notebook: {output_path.name}", 'INFO')
-                
-                # Show output locations
-                output_reports_dir = self.project_root / 'data' / 'processed' / 'Trail Balance'
-                self.log_message(f"\n📂 OUTPUT LOCATIONS:", 'INFO')
-                self.log_message(f"   Excel Reports: {output_reports_dir}", 'INFO')
-                self.log_message(f"   Executed Notebooks: {output_dir}", 'INFO')
-                
-                # Enable export button and refresh reports list
-                self.root.after(0, lambda: self.export_button.config(state='normal'))
-                self.root.after(0, lambda: self.refresh_reports_list())
-                self.root.after(0, lambda: messagebox.showinfo(
-                    "Success",
-                    f"✅ Processing complete!\n\n"
-                    f"📓 Executed Notebook:\n{output_path.name}\n\n"
-                    f"📊 Excel Reports saved to:\n{output_reports_dir}\n\n"
-                    f"Click '📂 Open Results Folder' to view outputs."
-                ))
-            else:
-                self.log_message("\n" + "="*60, 'ERROR')
-                self.log_message("❌ NOTEBOOK EXECUTION FAILED", 'ERROR')
-                self.log_message("="*60, 'ERROR')
-                self.root.after(0, lambda: messagebox.showerror(
-                    "Error",
-                    "Notebook execution failed.\nCheck the log for details."
-                ))
-        
-        except Exception as e:
-            self.log_message(f"\n❌ ERROR: {str(e)}", 'ERROR')
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to execute notebook:\n{str(e)}"))
-        
-        finally:
-            self.progress.stop()
-            self.root.after(0, lambda: self.process_button.config(state='normal'))
-
-
-    def run_dotnet_poc_gui(self):
-        """Run the dotnet POC via ExecutorDispatcher and show results in GUI"""
-        # Disable run button while executing
-        self.dotnet_run_button.config(state='disabled')
-        self.log_message("\n🚀 Running Dotnet POC...", 'INFO')
-
-        def _worker():
-            try:
-                # Load registry and find tb_text_upper
-                reg_path = self.project_root / 'config' / 'report_registry.json'
-                if not reg_path.exists():
-                    self.log_message(f"❌ Registry not found: {reg_path}", 'ERROR')
-                    return
-
-                with open(reg_path, 'r', encoding='utf-8') as f:
-                    reg = json.load(f)
-
-                reports = reg.get('reports', [])
-                report = next((r for r in reports if r.get('id') == 'tb_text_upper'), None)
-                if report is None:
-                    self.log_message("❌ tb_text_upper not found in registry", 'ERROR')
-                    return
-
-
-                project_rel = report.get('path')
-                params = report.get('parameters', {})
-                # Prefer GUI-provided paths (user may have edited them)
-                input_path = self.poc_input_var.get() or params.get('input_path')
-                output_path = self.poc_output_var.get() or params.get('output_path')
-
-                ed = ExecutorDispatcher(self.project_root)
-                proj_path = self.project_root / project_rel
-                args = [str(input_path), str(output_path)] if output_path else [str(input_path)]
-
-                self.log_message(f"▶ Executing dotnet project: {proj_path} args={args}", 'INFO')
-                res = ed.run_dotnet_project(proj_path, args)
-
-                self.log_message(f"  returncode: {res.get('returncode')}", 'INFO')
-                if not res.get('ok'):
-                    self.log_message(f"  ERROR: {res.get('stderr') or res.get('error')}", 'ERROR')
-                    self.root.after(0, lambda: messagebox.showerror("Error", "Dotnet POC failed. Check log."))
-                else:
-                    self.log_message("  ✓ Dotnet POC completed", 'INFO')
-                    stdout = res.get('stdout') or ''
-                    # Parse WROTE: lines
-                    wrote_paths = []
-                    for line in (stdout.splitlines()):
-                        if line.strip().upper().startswith('WROTE:'):
-                            p = line.split(':', 1)[1].strip()
-                            wrote_paths.append(p)
-
-                    if wrote_paths:
-                        self.log_message(f"  ✓ Files written: {len(wrote_paths)}", 'INFO')
-                        for p in wrote_paths:
-                            self.log_message(f"    - {p}", 'INFO')
-
-                        # Enable export button
-                        self.root.after(0, lambda: self.dotnet_export_button.config(state='normal'))
-                    else:
-                        self.log_message("  ⚠️  No output files detected from dotnet stdout", 'WARNING')
-
-            except Exception as e:
-                self.log_message(f"❌ ERROR running dotnet POC: {str(e)}", 'ERROR')
-            finally:
-                # Re-enable run button
-                self.root.after(0, lambda: self.dotnet_run_button.config(state='normal'))
-
-        thread = threading.Thread(target=_worker)
-        thread.daemon = True
-        thread.start()
-
-
-    def export_poc_results(self):
-        """Create a zip of the POC outputs and open the folder"""
-        try:
-            # Determine registry output_path for tb_text_upper
-            reg_path = self.project_root / 'config' / 'report_registry.json'
-            if not reg_path.exists():
-                self.log_message(f"❌ Registry not found: {reg_path}", 'ERROR')
-                return
-
-            with open(reg_path, 'r', encoding='utf-8') as f:
-                reg = json.load(f)
-
-            reports = reg.get('reports', [])
-            report = next((r for r in reports if r.get('id') == 'tb_text_upper'), None)
-            if report is None:
-                self.log_message("❌ tb_text_upper not found in registry", 'ERROR')
-                return
-
-            params = report.get('parameters', {})
-            # Prefer GUI override if present
-            output_path = self.poc_output_var.get() or params.get('output_path')
-            outdir = self.project_root / (output_path or 'data/processed/TbTextTransform/out_upper')
-
-            if not outdir.exists():
-                self.log_message(f"⚠️ Output folder not found: {outdir}", 'WARNING')
-                messagebox.showwarning("Warning", f"No outputs found at:\n{outdir}")
-                return
-
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            export_dir = self.project_root / 'data' / 'processed' / 'TbTextTransform' / 'exports'
-            export_dir.mkdir(parents=True, exist_ok=True)
-            archive_name = str(export_dir / f'poc_output_{timestamp}')
-
-            # Make archive (zip)
-            shutil.make_archive(archive_name, 'zip', root_dir=str(outdir))
-            archive_file = archive_name + '.zip'
-
-            self.log_message(f"📦 Created export: {archive_file}", 'INFO')
-
-            # Open folder containing archive
-            if archive_file and Path(archive_file).exists():
-                import os
-                if os.name == 'nt':
-                    subprocess.Popen(f'explorer "{export_dir}"')
-                else:
-                    subprocess.Popen(['xdg-open', str(export_dir)])
-
-                messagebox.showinfo("Export Complete", f"Export created:\n{archive_file}")
-
-        except Exception as e:
-            self.log_message(f"❌ Error exporting POC results: {str(e)}", 'ERROR')
-            messagebox.showerror("Error", f"Failed to export POC outputs:\n{str(e)}")
     
-
+    # ========== SECTION 6: UTILITY FUNCTIONS ==========
     
+    def open_logs_folder(self):
+        """Open the logs folder in Windows Explorer"""
+        try:
+            logs_dir = self.project_root / 'logs'
+            
+            if not logs_dir.exists():
+                logs_dir.mkdir(parents=True, exist_ok=True)
+                self.log_message("📂 Created logs folder", 'INFO')
+            
+            # Open in Explorer
+            import subprocess
+            subprocess.run(['explorer', str(logs_dir)])
+            self.log_message(f"📂 Opened logs folder: {logs_dir}", 'INFO')
+            
+        except Exception as e:
+            self.log_message(f"❌ Failed to open logs folder: {e}", 'ERROR')
+            messagebox.showerror("Error", f"Could not open logs folder:\n{e}")
     
     def export_results(self):
-        """Open results folder in Windows Explorer"""
+        """
+        Open the results folder in Windows Explorer
+        
+        Opens the year/month specific folder containing the executed report output.
+        Respects Local vs Shared Drive selection and validates folder existence.
+        """
         try:
             self.log_message("\n💾 Opening results folders...", 'INFO')
             
-            # Determine output directory based on user selection
-            selection = self.output_location.get()
-            if "Shared Drive" in selection:
-                output_dir = Path("X:/Trail Balance/data/processed/Trail Balance")
-                self.log_message("  📂 Opening Shared Drive output folder...", 'INFO')
+            # Get the selected year and month from GUI
+            year = self.selected_year.get()
+            month = self.selected_month.get()
+            
+            if not year:
+                messagebox.showwarning("Warning", "Please select a year first")
+                return
+            
+            # Check BOTH possible locations and open whichever has files
+            shared_drive_dir = Path(f"X:/Trail Balance/data/processed/{year}/{month}") if month else Path(f"X:/Trail Balance/data/processed/{year}")
+            local_dir = (self.project_root / 'data' / 'processed' / 'Trial Balance' / year / month) if month else (self.project_root / 'data' / 'processed' / 'Trial Balance' / year)
+            
+            # Check which location has Excel files
+            shared_files = list(shared_drive_dir.glob('*.xlsx')) if shared_drive_dir.exists() else []
+            local_files = list(local_dir.glob('*.xlsx')) if local_dir.exists() else []
+            
+            # Open the location that has files (prioritize Shared Drive)
+            if shared_files:
+                output_dir = shared_drive_dir
+                self.log_message(f"  📂 Found {len(shared_files)} file(s) on Shared Drive: {year}/{month if month else ''}", 'INFO')
+            elif local_files:
+                output_dir = local_dir
+                self.log_message(f"  📂 Found {len(local_files)} file(s) in Local Storage: {year}/{month if month else ''}", 'INFO')
             else:
-                output_dir = self.project_root / 'data' / 'processed' / 'Trail Balance'
-                self.log_message("  📂 Opening Local Storage output folder...", 'INFO')
+                # Default to output location setting if no files found yet
+                selection = self.output_location.get()
+                if "Shared Drive" in selection:
+                    output_dir = shared_drive_dir
+                else:
+                    output_dir = local_dir
+                self.log_message(f"  📂 No files found yet, opening default location...", 'INFO')
+                self.log_message(f"  📂 Opening Local Storage output folder: {year}/{month if month else ''}", 'INFO')
             
             executed_dir = self.project_root / 'notebooks' / 'executed_trial_balance_reports'
             
